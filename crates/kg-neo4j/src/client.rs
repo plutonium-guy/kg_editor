@@ -72,6 +72,110 @@ fn validate_uow(uow: &UnitOfWork, reg: &SchemaRegistry) -> Vec<kg_core::error::S
     out
 }
 
+impl Client {
+    pub async fn query<T: crate::from_row::FromRow>(
+        &self,
+        cypher: &str,
+        params: impl IntoIterator<Item = (impl Into<String>, kg_core::value::PropValue)>,
+    ) -> Result<Vec<T>, Neo4jError> {
+        use kg_core::cypher::Statement;
+        let stmt = Statement::new(cypher, params);
+        let res = self.transport.run_autocommit(&stmt).await?;
+        let mut out = Vec::with_capacity(res.rows.len());
+        for row in res.rows {
+            out.push(T::from_row(&row).map_err(|e| Neo4jError::Core(kg_core::error::CoreError::InvalidPatch {
+                field: "row".into(), reason: e.to_string(),
+            }))?);
+        }
+        Ok(out)
+    }
+
+    pub async fn fetch_node(
+        &self,
+        id: kg_core::node::NodeId,
+    ) -> Result<Option<kg_core::node::Node>, Neo4jError> {
+        use kg_core::value::PropValue;
+        let res: Vec<std::collections::BTreeMap<String, PropValue>> = self.query(
+            "MATCH (n) WHERE id(n) = $id RETURN labels(n) AS labels, properties(n) AS props",
+            [("id", PropValue::Int(id.0))],
+        ).await?;
+        let Some(row) = res.into_iter().next() else { return Ok(None); };
+        let labels = match row.get("labels") {
+            Some(PropValue::List(xs)) => xs.iter().filter_map(|x| match x {
+                PropValue::String(s) => Some(s.clone()), _ => None,
+            }).collect(),
+            _ => smallvec::smallvec![],
+        };
+        let props = match row.get("props") {
+            Some(PropValue::Map(m)) => m.clone(),
+            _ => Default::default(),
+        };
+        Ok(Some(kg_core::node::Node { id: Some(id), labels, props }))
+    }
+
+    pub async fn fetch_rel(
+        &self,
+        id: kg_core::rel::RelId,
+    ) -> Result<Option<kg_core::rel::Rel>, Neo4jError> {
+        use kg_core::value::PropValue;
+        let res: Vec<std::collections::BTreeMap<String, PropValue>> = self.query(
+            "MATCH (s)-[r]->(e) WHERE id(r) = $id \
+             RETURN type(r) AS type, id(s) AS start_id, id(e) AS end_id, properties(r) AS props",
+            [("id", PropValue::Int(id.0))],
+        ).await?;
+        let Some(row) = res.into_iter().next() else { return Ok(None); };
+        let ty = match row.get("type") {
+            Some(PropValue::String(s)) => s.clone(),
+            _ => return Ok(None),
+        };
+        let start_id = match row.get("start_id") {
+            Some(PropValue::Int(i)) => *i,
+            _ => return Ok(None),
+        };
+        let end_id = match row.get("end_id") {
+            Some(PropValue::Int(i)) => *i,
+            _ => return Ok(None),
+        };
+        let props = match row.get("props") {
+            Some(PropValue::Map(m)) => m.clone(),
+            _ => Default::default(),
+        };
+        Ok(Some(kg_core::rel::Rel {
+            id: Some(id),
+            r#type: ty,
+            start: kg_core::node::NodeRef::Server(kg_core::node::NodeId(start_id)),
+            end:   kg_core::node::NodeRef::Server(kg_core::node::NodeId(end_id)),
+            props,
+        }))
+    }
+
+    pub async fn materialize_schema(&self) -> Result<(), Neo4jError> {
+        let Some(reg) = &self.registry else { return Ok(()); };
+        let mut uow = UnitOfWork::new();
+        for ns in reg.nodes() {
+            for unique in &ns.uniqueness {
+                uow.ensure_constraint(kg_core::uow::NodeConstraint::Unique {
+                    label: ns.label.clone(), props: unique.clone(),
+                });
+            }
+            for ix in &ns.indexes {
+                uow.ensure_index(kg_core::uow::IndexSpec {
+                    label: ns.label.clone(), props: ix.clone(),
+                });
+            }
+            for p in &ns.props {
+                if p.required {
+                    uow.ensure_constraint(kg_core::uow::NodeConstraint::Exists {
+                        label: ns.label.clone(), prop: p.name.clone(),
+                    });
+                }
+            }
+        }
+        self.commit_unchecked(uow).await?;
+        Ok(())
+    }
+}
+
 pub struct ClientBuilder {
     uri: String,
     auth: Option<Auth>,

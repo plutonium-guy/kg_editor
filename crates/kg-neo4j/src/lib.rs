@@ -12,6 +12,8 @@ compile_error!(
 
 pub mod auth;
 pub mod error;
+pub mod from_row;
+pub use from_row::{FromRow, RowError};
 mod convert;
 mod transport;
 
