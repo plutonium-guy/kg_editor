@@ -177,6 +177,7 @@ impl Client {
 }
 
 pub struct ClientBuilder {
+    #[allow(dead_code)]
     uri: String,
     auth: Option<Auth>,
     database: Option<String>,
