@@ -10,7 +10,9 @@ compile_error!(
     "kg-neo4j requires exactly one of the `native` or `wasm` features"
 );
 
+pub mod auth;
 pub mod error;
 
+pub use auth::{basic, Auth};
 pub use error::{Neo4jError, TransportError};
 pub use kg_core;
