@@ -8,12 +8,14 @@ use std::collections::BTreeMap;
 use crate::error::TransportError;
 
 #[derive(Clone, Debug, Default)]
+#[allow(dead_code)]
 pub struct StatementResult {
     pub rows: Vec<BTreeMap<String, PropValue>>,
     pub counters: Counters,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
+#[allow(dead_code)]
 pub struct Counters {
     pub nodes_created: u32,
     pub nodes_deleted: u32,
@@ -27,6 +29,7 @@ pub struct Counters {
 }
 
 #[derive(Clone, Debug, Default)]
+#[allow(dead_code)]
 pub struct TxOutcome {
     pub statements: Vec<StatementResult>,
     pub counters: Counters,
@@ -34,6 +37,7 @@ pub struct TxOutcome {
 
 #[cfg(not(target_arch = "wasm32"))]
 #[async_trait]
+#[allow(dead_code)]
 pub(crate) trait Transport: Send + Sync {
     async fn run_tx(&self, stmts: &[Statement]) -> Result<TxOutcome, TransportError>;
     async fn run_autocommit(&self, stmt: &Statement) -> Result<StatementResult, TransportError>;
@@ -41,6 +45,7 @@ pub(crate) trait Transport: Send + Sync {
 
 #[cfg(target_arch = "wasm32")]
 #[async_trait(?Send)]
+#[allow(dead_code)]
 pub(crate) trait Transport {
     async fn run_tx(&self, stmts: &[Statement]) -> Result<TxOutcome, TransportError>;
     async fn run_autocommit(&self, stmt: &Statement) -> Result<StatementResult, TransportError>;
