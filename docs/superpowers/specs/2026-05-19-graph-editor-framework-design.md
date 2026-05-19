@@ -300,7 +300,8 @@ pub(crate) struct Statement {
 default = ["native"]
 native  = ["dep:neo4rs", "dep:tokio"]
 wasm    = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures",
-           "dep:web-sys", "dep:js-sys", "dep:serde-wasm-bindgen"]
+           "dep:web-sys", "dep:js-sys", "dep:serde-wasm-bindgen",
+           "dep:serde_json", "dep:base64"]
 ```
 
 A `compile_error!` guard rejects builds that enable both `native` and `wasm`
@@ -386,7 +387,10 @@ native; on wasm32 they're conditional.
   -> `PropValue`).
 
 ### Tier 3 — WASM smoke tests
-- `wasm-bindgen-test` with mocked `fetch`.
+- `wasm-bindgen-test` against an injectable HTTP client. The `http.rs`
+  transport exposes a `HttpClient` trait internally with two impls: the
+  real `web-sys::fetch`-backed one for production builds, and a recording
+  in-memory impl used only in tests.
 - Assert request URL, method, headers, and body shape match the Neo4j
   HTTP Query API v2 spec for each statement type.
 - No live browser-to-Neo4j run in CI; one manual end-to-end smoke is
