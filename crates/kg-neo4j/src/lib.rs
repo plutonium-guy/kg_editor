@@ -23,3 +23,10 @@ pub use client::{Client, ClientBuilder, CommitResult};
 pub use auth::{basic, Auth};
 pub use error::{Neo4jError, TransportError};
 pub use kg_core;
+
+#[cfg(feature = "wasm")]
+pub use transport::http::{
+    HttpClient, HttpResponse,
+    RecordedRequest, RecordingHttpClient,
+    WebSysHttpClient,
+};

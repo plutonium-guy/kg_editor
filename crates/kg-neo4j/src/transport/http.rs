@@ -129,3 +129,77 @@ impl<C: HttpClient> Transport for HttpTransport<C> {
         Ok(outcome.statements.into_iter().next().unwrap_or_default())
     }
 }
+
+// ── WebSysHttpClient ──────────────────────────────────────────────────────────
+
+use wasm_bindgen::JsCast;
+use wasm_bindgen_futures::JsFuture;
+use web_sys::{Headers, Request, RequestInit, RequestMode, Response};
+
+/// Production HTTP client backed by the browser `fetch` API.
+pub struct WebSysHttpClient;
+
+#[async_trait(?Send)]
+impl HttpClient for WebSysHttpClient {
+    async fn post(&self, url: &str, headers: &[(String, String)], body: &str)
+        -> Result<HttpResponse, TransportError>
+    {
+        let init = RequestInit::new();
+        init.set_method("POST");
+        init.set_mode(RequestMode::Cors);
+        init.set_body(&wasm_bindgen::JsValue::from_str(body));
+        let req = Request::new_with_str_and_init(url, &init)
+            .map_err(|e| TransportError::Connect(format!("{e:?}")))?;
+        let h: Headers = req.headers();
+        for (k, v) in headers {
+            h.set(k, v).map_err(|e| TransportError::Connect(format!("{e:?}")))?;
+        }
+        let win = web_sys::window()
+            .ok_or_else(|| TransportError::Connect("no window".into()))?;
+        let resp_val = JsFuture::from(win.fetch_with_request(&req))
+            .await
+            .map_err(|e| TransportError::Connect(format!("{e:?}")))?;
+        let resp: Response = resp_val
+            .dyn_into()
+            .map_err(|_| TransportError::Protocol("not a Response".into()))?;
+        let status = resp.status();
+        let text_promise = resp.text()
+            .map_err(|e| TransportError::Protocol(format!("{e:?}")))?;
+        let body_val = JsFuture::from(text_promise)
+            .await
+            .map_err(|e| TransportError::Protocol(format!("{e:?}")))?;
+        let body = body_val.as_string().unwrap_or_default();
+        Ok(HttpResponse { status, body })
+    }
+}
+
+// ── RecordingHttpClient ───────────────────────────────────────────────────────
+
+/// A request captured by [`RecordingHttpClient`].
+#[derive(Debug, Clone)]
+pub struct RecordedRequest {
+    pub url: String,
+    pub headers: Vec<(String, String)>,
+    pub body: String,
+}
+
+/// Recording client for tests: captures all outgoing requests and returns a
+/// single canned [`HttpResponse`]. Wasm is single-threaded so `RefCell` is fine.
+pub struct RecordingHttpClient {
+    pub captured: std::cell::RefCell<Vec<RecordedRequest>>,
+    pub canned: HttpResponse,
+}
+
+#[async_trait(?Send)]
+impl HttpClient for RecordingHttpClient {
+    async fn post(&self, url: &str, headers: &[(String, String)], body: &str)
+        -> Result<HttpResponse, TransportError>
+    {
+        self.captured.borrow_mut().push(RecordedRequest {
+            url: url.into(),
+            headers: headers.to_vec(),
+            body: body.into(),
+        });
+        Ok(self.canned.clone())
+    }
+}
