@@ -56,9 +56,50 @@ async fn neo4j_client_with_schema(
     (client, container)
 }
 
+/// Returns a connected client using an env-supplied URI/password when available
+/// (CI service container path), otherwise falls back to spinning up a testcontainers
+/// instance (local dev path).
+async fn client_via_env_or_container(
+) -> (kg_neo4j::Client, Option<testcontainers::ContainerAsync<GenericImage>>) {
+    if let (Ok(uri), Ok(pwd)) = (std::env::var("NEO4J_URI"), std::env::var("NEO4J_PASSWORD")) {
+        let client = ClientBuilder::new(&uri)
+            .auth(basic("neo4j", &pwd))
+            .build()
+            .await
+            .expect("connect via env");
+        return (client, None);
+    }
+    let (client, container) = neo4j_client().await;
+    (client, Some(container))
+}
+
+/// Like `client_via_env_or_container` but also applies the standard test schema.
+async fn client_with_schema_via_env_or_container(
+) -> (kg_neo4j::Client, Option<testcontainers::ContainerAsync<GenericImage>>) {
+    use kg_core::schema::{NodeSchema, PropType, SchemaRegistry};
+    if let (Ok(uri), Ok(pwd)) = (std::env::var("NEO4J_URI"), std::env::var("NEO4J_PASSWORD")) {
+        let mut reg = SchemaRegistry::new();
+        reg.add_node(
+            NodeSchema::builder("Person")
+                .prop("name", PropType::String)
+                .unique(["name"])
+                .build(),
+        );
+        let client = ClientBuilder::new(&uri)
+            .auth(basic("neo4j", &pwd))
+            .schema(reg)
+            .build()
+            .await
+            .expect("connect with schema via env");
+        return (client, None);
+    }
+    let (client, container) = neo4j_client_with_schema().await;
+    (client, Some(container))
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn create_two_nodes_and_a_rel() {
-    let (client, _container) = neo4j_client().await;
+    let (client, _container) = client_via_env_or_container().await;
 
     let mut uow = client.unit_of_work();
     let a = uow.create_node(["Person"], [("name", PropValue::from("Alice"))]);
@@ -69,7 +110,7 @@ async fn create_two_nodes_and_a_rel() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn fetch_after_commit() {
-    let (client, _c) = neo4j_client().await;
+    let (client, _c) = client_via_env_or_container().await;
     let rows: Vec<std::collections::BTreeMap<String, kg_core::value::PropValue>> = client
         .query(
             "CREATE (n:Person {name:$name}) RETURN id(n) AS id",
@@ -91,7 +132,7 @@ async fn fetch_after_commit() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn materialize_constraint_idempotent() {
-    let (client, _c) = neo4j_client_with_schema().await;
+    let (client, _c) = client_with_schema_via_env_or_container().await;
     client.materialize_schema().await.unwrap();
     client.materialize_schema().await.unwrap(); // idempotent
 }
