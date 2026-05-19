@@ -1,13 +1,14 @@
 //! Statement and parameter representation.
 
 use crate::value::PropValue;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// Parameter map. Keys are bare names (no leading `$`).
 pub type ParamMap = BTreeMap<String, PropValue>;
 
 /// A single parameterized Cypher statement.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Statement {
     pub cypher: String,
     pub params: ParamMap,
