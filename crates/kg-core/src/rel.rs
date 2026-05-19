@@ -1,0 +1,1 @@
+//! Relationship types and identifiers.
