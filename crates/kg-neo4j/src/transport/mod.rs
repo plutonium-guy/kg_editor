@@ -1,5 +1,8 @@
 //! Transport abstraction.
 
+#[cfg(feature = "native")]
+pub(crate) mod bolt;
+
 use async_trait::async_trait;
 use kg_core::cypher::Statement;
 use kg_core::value::PropValue;
