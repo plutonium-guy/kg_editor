@@ -12,6 +12,7 @@ compile_error!(
 
 pub mod auth;
 pub mod error;
+mod transport;
 
 pub use auth::{basic, Auth};
 pub use error::{Neo4jError, TransportError};

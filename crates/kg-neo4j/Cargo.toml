@@ -21,9 +21,10 @@ wasm    = [
 ]
 
 [dependencies]
-kg-core    = { path = "../kg-core", version = "0.1" }
-serde      = { workspace = true }
-thiserror  = { workspace = true }
+async-trait = "0.1"
+kg-core     = { path = "../kg-core", version = "0.1" }
+serde       = { workspace = true }
+thiserror   = { workspace = true }
 
 # native-only
 neo4rs     = { workspace = true, optional = true }
