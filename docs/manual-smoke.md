@@ -21,6 +21,6 @@
 
 Record result here:
 
-| Date       | Engineer | Browser    | Pass/Fail |
-|------------|----------|------------|-----------|
-| YYYY-MM-DD | name     | Chrome 140 |           |
+| Date       | Engineer | Browser            | Pass/Fail | Notes |
+|------------|----------|--------------------|-----------|-------|
+| 2026-05-20 | amiyamandal | Chrome (headless, wasm-pack 0.13) | PASS | Executed via `wasm-pack test --headless --chrome crates/kg-neo4j --no-default-features --features wasm`; 2/2 tests passed (`recording_client_captures_request`, `recording_client_canned_body_passes_through`). Browser-to-Neo4j live run still pending. |

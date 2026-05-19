@@ -123,6 +123,31 @@ impl UnitOfWork {
         local
     }
 
+    pub fn merge_rel<T, I, J, K1, K2>(
+        &mut self,
+        start: impl Into<NodeRef>,
+        end: impl Into<NodeRef>,
+        r#type: T,
+        key_props: I,
+        set_props: J,
+    ) -> LocalId
+    where
+        T: Into<String>,
+        I: IntoIterator<Item = (K1, PropValue)>, K1: Into<String>,
+        J: IntoIterator<Item = (K2, PropValue)>, K2: Into<String>,
+    {
+        let local = self.fresh_local();
+        self.ops.push(StagedOp::MergeRel {
+            local,
+            r#type: r#type.into(),
+            start: start.into(),
+            end: end.into(),
+            key_props: key_props.into_iter().map(|(k, v)| (k.into(), v)).collect(),
+            set_props: set_props.into_iter().map(|(k, v)| (k.into(), v)).collect(),
+        });
+        local
+    }
+
     pub fn update_rel(&mut self, id: RelId, patch: PropPatch) {
         self.ops.push(StagedOp::UpdateRel { id, patch });
     }
@@ -171,6 +196,28 @@ mod tests {
         let a = uow.create_node(["P"], [] as [(String, PropValue); 0]);
         uow.create_rel(NodeRef::Local(a), NodeRef::Server(NodeId(9)), "R", [] as [(String, PropValue); 0]);
         assert_eq!(uow.ops().len(), 2);
+    }
+
+    #[test]
+    fn merge_rel_stages_correctly() {
+        let mut uow = UnitOfWork::new();
+        let a = uow.create_node(["P"], [] as [(String, PropValue); 0]);
+        let b = uow.create_node(["P"], [] as [(String, PropValue); 0]);
+        let r = uow.merge_rel(
+            a, b, "KNOWS",
+            [("since", PropValue::Int(2020))],
+            [("strength", PropValue::Float(0.8))],
+        );
+        assert_eq!(uow.ops().len(), 3);
+        match uow.ops().last() {
+            Some(StagedOp::MergeRel { r#type, key_props, set_props, .. }) => {
+                assert_eq!(r#type, "KNOWS");
+                assert_eq!(key_props.len(), 1);
+                assert_eq!(set_props.len(), 1);
+            }
+            _ => panic!("expected MergeRel"),
+        }
+        let _ = r;
     }
 
     #[test]

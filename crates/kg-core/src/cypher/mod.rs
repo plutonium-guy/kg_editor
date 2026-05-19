@@ -10,6 +10,7 @@ pub use statement::{ParamMap, Statement};
 use crate::error::CoreError;
 use crate::uow::{plan::CommitPlan, StagedOp, UnitOfWork};
 
+/// Lowers a [`UnitOfWork`] into an ordered batch of parameterized Cypher statements.
 pub struct CypherEmitter;
 
 impl CypherEmitter {

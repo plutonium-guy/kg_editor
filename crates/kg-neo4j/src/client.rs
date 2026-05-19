@@ -43,6 +43,7 @@ impl Client {
     }
 }
 
+/// Outcome of a successful `Client::commit`. Phase-0: `id_map` is currently empty; populated id mapping is tracked for a later release.
 #[derive(Debug, Default)]
 pub struct CommitResult {
     pub id_map: HashMap<kg_core::node::LocalId, i64>,
@@ -176,6 +177,7 @@ impl Client {
     }
 }
 
+/// Fluent builder for [`Client`]. Configure URI, auth, optional database name, and optional schema registry, then call `build()` (native) or `build_with_http(client)` (wasm).
 pub struct ClientBuilder {
     #[allow(dead_code)]
     uri: String,

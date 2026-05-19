@@ -6,6 +6,7 @@ pub enum Auth {
     Basic { user: String, password: String },
 }
 
+/// Constructs `Auth::Basic` from a username + password.
 pub fn basic(user: impl Into<String>, password: impl Into<String>) -> Auth {
     Auth::Basic { user: user.into(), password: password.into() }
 }
