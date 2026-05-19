@@ -3,6 +3,9 @@
 #[cfg(feature = "native")]
 pub(crate) mod bolt;
 
+#[cfg(feature = "wasm")]
+pub(crate) mod http;
+
 use async_trait::async_trait;
 use kg_core::cypher::Statement;
 use kg_core::value::PropValue;
@@ -38,7 +41,7 @@ pub struct TxOutcome {
     pub counters: Counters,
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(feature = "wasm"))]
 #[async_trait]
 #[allow(dead_code)]
 pub(crate) trait Transport: Send + Sync {
@@ -46,7 +49,7 @@ pub(crate) trait Transport: Send + Sync {
     async fn run_autocommit(&self, stmt: &Statement) -> Result<StatementResult, TransportError>;
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(feature = "wasm")]
 #[async_trait(?Send)]
 #[allow(dead_code)]
 pub(crate) trait Transport {
