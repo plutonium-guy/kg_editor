@@ -199,3 +199,21 @@ impl ClientBuilder {
         Ok(Client { transport: Box::new(bt), registry: self.registry })
     }
 }
+
+#[cfg(feature = "wasm")]
+impl ClientBuilder {
+    /// Build a client backed by an HTTP transport using the supplied client.
+    /// Use `WebSysHttpClient` for browser fetch, or any custom impl.
+    pub fn build_with_http<C>(self, client: C) -> Result<Client, Neo4jError>
+    where
+        C: crate::transport::http::HttpClient + 'static,
+    {
+        use std::sync::Arc;
+        let auth = self.auth.ok_or_else(|| Neo4jError::Auth("missing auth".into()))?;
+        let database = self.database.unwrap_or_else(|| "neo4j".into());
+        let tr = crate::transport::http::HttpTransport::new(
+            self.uri, database, &auth, Arc::new(client),
+        );
+        Ok(Client { transport: Box::new(tr), registry: self.registry })
+    }
+}
