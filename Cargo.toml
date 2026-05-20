@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["crates/kg-core", "crates/kg-neo4j", "examples"]
-exclude = ["examples/wasm_crud"]
+members  = ["crates/kg-core", "crates/kg-neo4j", "crates/kg-core-wasm", "crates/kg-server", "examples"]
+exclude  = ["examples/wasm_crud", "webui"]
 
 [workspace.package]
 edition = "2021"
@@ -26,3 +26,11 @@ wasm-bindgen-test = "0.3"
 web-sys      = { version = "0.3", features = ["Request","RequestInit","RequestMode","Response","Window","Headers"] }
 js-sys       = "0.3"
 serde-wasm-bindgen = "0.6"
+axum         = "0.7"
+tower        = "0.5"
+tower-http   = { version = "0.6", features = ["cors", "fs", "trace"] }
+hyper        = "1"
+tokio-tungstenite = "0.23"
+tracing      = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+reqwest      = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }

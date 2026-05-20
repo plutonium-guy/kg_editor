@@ -5,3 +5,13 @@ Cargo.lock
 crates/*/Cargo.lock
 examples/wasm_crud/pkg/
 node_modules/
+
+# webui
+webui/node_modules/
+webui/dist/
+webui/pkg/
+webui/test-results/
+webui/playwright-report/
+
+# wasm-pack output
+crates/kg-core-wasm/pkg/
