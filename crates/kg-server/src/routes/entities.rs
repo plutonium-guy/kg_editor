@@ -1,4 +1,4 @@
-use axum::{extract::State, Json};
+use axum::{extract::{Path, State}, Json};
 use kg_core::value::PropValue;
 use kg_schema::FieldType;
 use serde::{Deserialize, Serialize};
@@ -145,6 +145,94 @@ pub(crate) fn json_to_prop(v: serde_json::Value) -> Result<PropValue, ApiError> 
             PropValue::Map(m)
         }
     })
+}
+
+// ── PUT /entities/:id ────────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+pub struct UpdateBody {
+    pub set: BTreeMap<String, serde_json::Value>,
+    #[serde(default)]
+    pub unset: Vec<String>,
+}
+
+pub async fn update(
+    State(s): State<AppState>,
+    Path(id): Path<i64>,
+    Json(body): Json<UpdateBody>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    // Find label first to validate.
+    let label_rows = s
+        .client
+        .query::<BTreeMap<String, PropValue>>(
+            "MATCH (n) WHERE id(n) = $id RETURN labels(n) AS labels",
+            [("id", PropValue::Int(id))],
+        )
+        .await
+        .map_err(ApiError::from)?;
+    let row = label_rows.into_iter().next().ok_or_else(|| ApiError {
+        code: "404.not_found".into(),
+        message: format!("no node with id {id}"),
+    })?;
+    let label = match row.get("labels") {
+        Some(PropValue::List(xs)) => xs.iter().find_map(|x| match x {
+            PropValue::String(s) => Some(s.clone()),
+            _ => None,
+        }),
+        _ => None,
+    };
+
+    if let Some(label) = label.as_deref() {
+        if let Some(def) = s.schema.nodes.get(label) {
+            let mut errs = vec![];
+            for (k, v) in &body.set {
+                if let Some(spec) = def.props.iter().find(|p| p.name == *k) {
+                    if !type_matches(v, &spec.ty) {
+                        errs.push(format!("field `{}` wrong type", k));
+                    }
+                }
+            }
+            if !errs.is_empty() {
+                return Err(ApiError {
+                    code: "400.validation".into(),
+                    message: errs.join("; "),
+                });
+            }
+        }
+    }
+
+    let mut sets = String::new();
+    let mut params: Vec<(String, PropValue)> = vec![("id".into(), PropValue::Int(id))];
+    let mut i = 0;
+    for (k, v) in &body.set {
+        // Sanitize prop key (allow only alphanumerics + underscore).
+        if !k.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            return Err(ApiError {
+                code: "400.bad_key".into(),
+                message: format!("illegal key `{k}`"),
+            });
+        }
+        let pkey = format!("p_{i}");
+        sets.push_str(&format!(" SET n.`{k}` = ${pkey}"));
+        params.push((pkey, json_to_prop(v.clone())?));
+        i += 1;
+    }
+    for k in &body.unset {
+        if !k.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            return Err(ApiError {
+                code: "400.bad_key".into(),
+                message: format!("illegal key `{k}`"),
+            });
+        }
+        sets.push_str(&format!(" REMOVE n.`{k}`"));
+    }
+    let cypher = format!("MATCH (n) WHERE id(n) = $id{sets} RETURN id(n) AS id");
+    let _ = s
+        .client
+        .query::<BTreeMap<String, PropValue>>(&cypher, params)
+        .await
+        .map_err(ApiError::from)?;
+    Ok(Json(serde_json::json!({"ok": true})))
 }
 
 pub(crate) fn prop_to_json(v: &PropValue) -> serde_json::Value {

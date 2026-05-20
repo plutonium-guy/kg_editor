@@ -164,3 +164,33 @@ async fn create_entity_validates_and_persists() {
     let r = cli.post(format!("{base}/entities")).json(&body).send().await.unwrap();
     assert_eq!(r.status().as_u16(), 400);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn update_entity_set_and_unset() {
+    let (base, _c) = start_server().await;
+    let cli = reqwest::Client::new();
+    let r = cli
+        .post(format!("{base}/entities"))
+        .json(&serde_json::json!({
+            "label": "Person",
+            "props": {"name": "Eve", "role": "engineer", "age": 30}
+        }))
+        .send()
+        .await
+        .unwrap();
+    let v: serde_json::Value = r.json().await.unwrap();
+    let id = v["id"].as_i64().unwrap();
+
+    let r = cli
+        .put(format!("{base}/entities/{id}"))
+        .json(&serde_json::json!({
+            "set": {"age": 31},
+            "unset": ["role"]
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert!(r.status().is_success(), "update failed: {}", r.status());
+    let v: serde_json::Value = r.json().await.unwrap();
+    assert_eq!(v["ok"], true);
+}
