@@ -182,6 +182,20 @@ impl Client {
     }
 }
 
+impl Client {
+    /// Run a single DDL statement as an auto-commit.
+    pub async fn run_autocommit_for_ddl(&self, stmt: &kg_core::cypher::Statement) -> Result<(), Neo4jError> {
+        self.transport.run_autocommit(stmt).await?;
+        Ok(())
+    }
+
+    /// Run a single chained data statement inside a transaction.
+    pub async fn run_tx_for_data(&self, stmt: &kg_core::cypher::Statement) -> Result<(), Neo4jError> {
+        let _ = self.transport.run_tx(std::slice::from_ref(stmt)).await?;
+        Ok(())
+    }
+}
+
 /// Fluent builder for [`Client`]. Configure URI, auth, optional database name, and optional schema registry, then call `build()` (native) or `build_with_http(client)` (wasm).
 pub struct ClientBuilder {
     #[allow(dead_code)]
