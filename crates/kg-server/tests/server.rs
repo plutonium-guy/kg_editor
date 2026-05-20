@@ -140,3 +140,27 @@ async fn schema_returns_yaml() {
     assert!(v["nodes"].get("Person").is_some(), "expected Person in returned schema");
     assert!(v["rels"].get("KNOWS").is_some(), "expected KNOWS in returned schema");
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn create_entity_validates_and_persists() {
+    let (base, _c) = start_server().await;
+    let cli = reqwest::Client::new();
+
+    let body = serde_json::json!({
+        "label": "Person",
+        "props": { "name": "Alice", "role": "engineer" }
+    });
+    let r = cli.post(format!("{base}/entities")).json(&body).send().await.unwrap();
+    assert!(r.status().is_success(), "got {}: {}", r.status(), r.text().await.unwrap());
+    let v: serde_json::Value = r.json().await.unwrap();
+    assert_eq!(v["label"], "Person");
+    assert!(v["id"].as_i64().is_some());
+
+    let body = serde_json::json!({"label": "Person", "props": { "role": "engineer" }});
+    let r = cli.post(format!("{base}/entities")).json(&body).send().await.unwrap();
+    assert_eq!(r.status().as_u16(), 400);
+
+    let body = serde_json::json!({"label": "Person", "props": { "name": "Bob", "role": "wizard" }});
+    let r = cli.post(format!("{base}/entities")).json(&body).send().await.unwrap();
+    assert_eq!(r.status().as_u16(), 400);
+}

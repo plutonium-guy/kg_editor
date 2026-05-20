@@ -20,6 +20,7 @@ pub fn router(state: state::AppState) -> Router {
         .route("/query",  post(routes::query::run))
         .route("/commit", post(routes::commit::run))
         .route("/schema", get(routes::schema::run))
+        .route("/entities", axum::routing::post(routes::entities::create))
         .with_state(state)
         .layer(TraceLayer::new_for_http())
         .layer(cors)
