@@ -12,6 +12,29 @@ async function asJson<T>(r: Response): Promise<T> {
   return r.json() as Promise<T>;
 }
 
+/** Wrap a plain JS value in a PropValue serde envelope so kg-server can deserialize it. */
+function envelope(v: unknown): Record<string, unknown> {
+  if (v === null || v === undefined) return { kind: "null", value: null };
+  if (typeof v === "boolean") return { kind: "bool", value: v };
+  if (typeof v === "number") {
+    return Number.isInteger(v) ? { kind: "int", value: v } : { kind: "float", value: v };
+  }
+  if (typeof v === "string") return { kind: "string", value: v };
+  if (Array.isArray(v)) return { kind: "list", value: v.map(envelope) };
+  if (typeof v === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, x] of Object.entries(v as Record<string, unknown>)) out[k] = envelope(x);
+    return { kind: "map", value: out };
+  }
+  throw new Error(`unsupported param type ${typeof v}`);
+}
+
+function envelopeParams(p: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(p)) out[k] = envelope(v);
+  return out;
+}
+
 export interface QueryResponse {
   rows: Record<string, unknown>[];
 }
@@ -20,7 +43,7 @@ export async function runQuery(cypher: string, params: Record<string, unknown> =
   const r = await fetch(`${BASE}/query`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ cypher, params }),
+    body: JSON.stringify({ cypher, params: envelopeParams(params) }),
   });
   return asJson<QueryResponse>(r);
 }
