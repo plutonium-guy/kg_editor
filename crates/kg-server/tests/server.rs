@@ -20,10 +20,19 @@ async fn spin_neo4j() -> (String, ContainerAsync<GenericImage>) {
     (uri, container)
 }
 
-async fn start_server() -> (String, ContainerAsync<GenericImage>) {
-    let (uri, container) = spin_neo4j().await;
+async fn start_server() -> (String, Option<ContainerAsync<GenericImage>>) {
+    let (uri, password, container) = match (
+        std::env::var("NEO4J_URI"),
+        std::env::var("NEO4J_PASSWORD"),
+    ) {
+        (Ok(u), Ok(p)) => (u, p, None),
+        _ => {
+            let (uri, c) = spin_neo4j().await;
+            (uri, "testtest".to_string(), Some(c))
+        }
+    };
     let client = ClientBuilder::new(&uri)
-        .auth(basic("neo4j", "testtest"))
+        .auth(basic("neo4j", &password))
         .build()
         .await
         .expect("connect");
