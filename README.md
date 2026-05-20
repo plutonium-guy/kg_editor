@@ -54,6 +54,21 @@ make webui-dev         # Vite dev server on :5173
 
 See [Phase 1 design](docs/superpowers/specs/2026-05-20-phase-1-ui-design.md) and [implementation plan](docs/superpowers/plans/2026-05-20-phase-1-ui.md).
 
+### Phase 2 (SME UI + AI MCP)
+```
+make neo4j-up
+KG_SCHEMA=$(pwd)/kg-schema.yaml NEO4J_PASSWORD=testtest cargo run -p kg-server
+cd webui && npm install && npm run dev
+# AI side, separate terminal:
+KG_SERVER_URL=http://localhost:9000 cargo run -p kg-mcp
+```
+
+See:
+- [Phase 2 design](docs/superpowers/specs/2026-05-20-phase-2-sme-ai-design.md)
+- [Phase 2 plan](docs/superpowers/plans/2026-05-20-phase-2-sme-ai.md)
+- [Manual UI smoke](docs/manual-ui-smoke.md)
+- [Manual MCP smoke](docs/manual-mcp-smoke.md)
+
 ## Docs
 
 `cargo doc --no-deps --all-features --open`
