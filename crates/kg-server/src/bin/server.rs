@@ -1,16 +1,8 @@
-mod config;
-mod error;
-mod routes;
-mod state;
-
-use axum::{routing::{get, post}, Router};
 use kg_neo4j::{auth::basic, ClientBuilder};
 use std::sync::Arc;
-use tower_http::cors::{Any, CorsLayer};
-use tower_http::trace::TraceLayer;
 
-use crate::config::Config;
-use crate::state::AppState;
+use kg_server::config::Config;
+use kg_server::state::AppState;
 
 #[tokio::main]
 async fn main() {
@@ -23,19 +15,7 @@ async fn main() {
         .expect("failed to connect to Neo4j");
     let state = AppState { client: Arc::new(client) };
 
-    let cors = CorsLayer::new()
-        .allow_methods(Any)
-        .allow_headers(Any)
-        .allow_origin(Any);
-
-    let app = Router::new()
-        .route("/health", get(routes::health::health))
-        .route("/query",  post(routes::query::run))
-        .route("/commit", post(routes::commit::run))
-        .with_state(state)
-        .layer(TraceLayer::new_for_http())
-        .layer(cors);
-
+    let app = kg_server::router(state);
     let listener = tokio::net::TcpListener::bind(&cfg.bind).await.expect("bind");
     tracing::info!("kg-server listening on {}", cfg.bind);
     axum::serve(listener, app).await.expect("serve");

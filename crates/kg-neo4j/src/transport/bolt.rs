@@ -46,6 +46,18 @@ impl BoltTransport {
     }
 }
 
+/// Map a neo4rs error to a TransportError, extracting the server-side Neo4j error code/message
+/// when available so the caller can distinguish syntax/client errors from transport failures.
+fn map_neo4rs_to_transport(e: neo4rs::Error) -> TransportError {
+    match e {
+        neo4rs::Error::Neo4j(ref neo4j_err) => TransportError::ServerError {
+            code: neo4j_err.code().to_string(),
+            message: neo4j_err.message().to_string(),
+        },
+        other => TransportError::Protocol(other.to_string()),
+    }
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 #[async_trait]
 impl Transport for BoltTransport {
@@ -54,7 +66,7 @@ impl Transport for BoltTransport {
             .graph
             .start_txn()
             .await
-            .map_err(|e| TransportError::Protocol(e.to_string()))?;
+            .map_err(map_neo4rs_to_transport)?;
 
         let mut statements = Vec::with_capacity(stmts.len());
         for stmt in stmts {
@@ -62,13 +74,19 @@ impl Transport for BoltTransport {
                 .map_err(|e| TransportError::Protocol(e.to_string()))?;
             let result = run_one(&mut txn, q)
                 .await
-                .map_err(|e| TransportError::Protocol(e.to_string()))?;
+                .map_err(|e| match e {
+                    // Neo4jError::Tx was already mapped via TransportError::ServerError; re-wrap.
+                    Neo4jError::Tx { code, message } => {
+                        TransportError::ServerError { code, message }
+                    }
+                    other => TransportError::Protocol(other.to_string()),
+                })?;
             statements.push(result);
         }
 
         txn.commit()
             .await
-            .map_err(|e| TransportError::Protocol(e.to_string()))?;
+            .map_err(map_neo4rs_to_transport)?;
 
         Ok(TxOutcome {
             statements,
@@ -102,14 +120,14 @@ async fn run_one(
     let mut stream = txn
         .execute(q)
         .await
-        .map_err(|e| Neo4jError::Transport(TransportError::Protocol(e.to_string())))?;
+        .map_err(|e| Neo4jError::from(map_neo4rs_to_transport(e)))?;
 
     let mut rows: Vec<BTreeMap<String, kg_core::value::PropValue>> = Vec::new();
 
     while let Some(row) = stream
         .next(txn.handle())
         .await
-        .map_err(|e| Neo4jError::Transport(TransportError::Protocol(e.to_string())))?
+        .map_err(|e| Neo4jError::from(map_neo4rs_to_transport(e)))?
     {
         // Deserialize the whole row as a BoltMap so we can iterate all columns.
         let bolt_map: neo4rs::BoltMap = row

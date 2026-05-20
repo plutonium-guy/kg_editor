@@ -7,6 +7,14 @@ license.workspace = true
 repository.workspace = true
 description = "Tiny HTTP proxy that fronts kg-neo4j (native Bolt) for the phase-1 UI."
 
+[lib]
+name = "kg_server"
+path = "src/lib.rs"
+
+[[bin]]
+name = "kg-server"
+path = "src/bin/server.rs"
+
 [dependencies]
 kg-core    = { path = "../kg-core" }
 kg-neo4j   = { path = "../kg-neo4j", features = ["native"] }
