@@ -37,11 +37,22 @@ client.commit(uow).await?;
 
 ## Build matrix
 
+### Phase 0 (Rust framework)
 ```
 cargo test  -p kg-core
-cargo test  -p kg-neo4j --features native              # needs make neo4j-up + Docker
+cargo test  -p kg-neo4j --features native
 wasm-pack test --headless --chrome crates/kg-neo4j --no-default-features --features wasm
 ```
+
+### Phase 1 (Browser UI)
+```
+make neo4j-up
+make wasm-build        # builds kg-core-wasm into webui/pkg
+make kg-server-run     # starts the HTTP proxy on :9000
+make webui-dev         # Vite dev server on :5173
+```
+
+See [Phase 1 design](docs/superpowers/specs/2026-05-20-phase-1-ui-design.md) and [implementation plan](docs/superpowers/plans/2026-05-20-phase-1-ui.md).
 
 ## Docs
 
