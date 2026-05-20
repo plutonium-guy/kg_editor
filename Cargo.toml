@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
-members  = ["crates/kg-core", "crates/kg-neo4j", "crates/kg-core-wasm"]
+members  = ["crates/kg-core", "crates/kg-neo4j", "crates/kg-core-wasm", "examples"]
+exclude  = ["examples/wasm_crud", "webui"]
 
 [workspace.package]
 edition = "2021"
