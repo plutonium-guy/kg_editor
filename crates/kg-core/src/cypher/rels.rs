@@ -110,6 +110,7 @@ pub fn emit_merge_rel(
 }
 
 pub fn emit_update_rel(id: RelId, patch: &PropPatch) -> Result<Statement, IdentError> {
+    let var = format!("r_upd_{}", id.0);
     let rkey = format!("rid_{}", id.0);
     let mut sets = vec![];
     let mut removes = vec![];
@@ -119,23 +120,24 @@ pub fn emit_update_rel(id: RelId, patch: &PropPatch) -> Result<Statement, IdentE
         match val {
             Some(v) => {
                 let pkey = format!("set_{}_{}", id.0, n);
-                sets.push(format!("SET r.`{n}` = ${pkey}"));
+                sets.push(format!("SET {var}.`{n}` = ${pkey}"));
                 params.push((pkey, v.clone()));
             }
-            None => removes.push(format!("REMOVE r.`{n}`")),
+            None => removes.push(format!("REMOVE {var}.`{n}`")),
         }
     }
     let body = sets.into_iter().chain(removes).collect::<Vec<_>>().join(" ");
     Ok(Statement::new(
-        format!("MATCH ()-[r]->() WHERE id(r) = ${rkey} {body}"),
+        format!("MATCH ()-[{var}]->() WHERE id({var}) = ${rkey} {body}"),
         params,
     ))
 }
 
 pub fn emit_delete_rel(id: RelId) -> Result<Statement, IdentError> {
+    let var = format!("r_del_{}", id.0);
     let rkey = format!("rid_{}", id.0);
     Ok(Statement::new(
-        format!("MATCH ()-[r]->() WHERE id(r) = ${rkey} DELETE r"),
+        format!("MATCH ()-[{var}]->() WHERE id({var}) = ${rkey} DELETE {var}"),
         [(rkey, PropValue::Int(id.0))],
     ))
 }
@@ -195,13 +197,13 @@ mod tests {
     fn update_rel_emits_match_id() {
         let s = emit_update_rel(RelId(5),
             &PropPatch::new().set("a", PropValue::Int(1))).unwrap();
-        assert!(s.cypher.contains("MATCH ()-[r]->() WHERE id(r) = $rid_5"));
-        assert!(s.cypher.contains("SET r.`a` = $set_5_a"));
+        assert!(s.cypher.contains("MATCH ()-[r_upd_5]->() WHERE id(r_upd_5) = $rid_5"));
+        assert!(s.cypher.contains("SET r_upd_5.`a` = $set_5_a"));
     }
 
     #[test]
     fn delete_rel_test() {
         let s = emit_delete_rel(RelId(8)).unwrap();
-        assert!(s.cypher.contains("DELETE r"));
+        assert!(s.cypher.contains("MATCH ()-[r_del_8]->() WHERE id(r_del_8) = $rid_8 DELETE r_del_8"));
     }
 }

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use crate::auth::Auth;
 use crate::error::Neo4jError;
-use crate::transport::{Transport, TxOutcome};
+use crate::transport::Transport;
 
 #[cfg(feature = "native")]
 use crate::transport::bolt::BoltTransport;
@@ -35,10 +35,15 @@ impl Client {
     }
 
     pub async fn commit_unchecked(&self, uow: UnitOfWork) -> Result<CommitResult, Neo4jError> {
-        let stmts = CypherEmitter::emit(&uow)?;
-        let _outcome: TxOutcome = self.transport.run_tx(&stmts).await?;
-        // Phase 0 returns an empty id_map; richer mapping deferred (requires
-        // emitter RETURN clauses + driver result decoding pass — tracked).
+        let out = CypherEmitter::emit(&uow)?;
+        // DDL each runs as its own auto-commit (Neo4j forbids mixing schema + data in one tx).
+        for ddl_stmt in &out.ddl {
+            self.transport.run_autocommit(ddl_stmt).await?;
+        }
+        // The chained data statement runs in its own transaction.
+        if let Some(data_stmt) = out.data {
+            let _ = self.transport.run_tx(std::slice::from_ref(&data_stmt)).await?;
+        }
         Ok(CommitResult { id_map: HashMap::new() })
     }
 }

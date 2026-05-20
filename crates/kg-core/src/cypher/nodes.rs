@@ -63,6 +63,7 @@ pub fn emit_merge_node(
 }
 
 pub fn emit_update_node(id: NodeId, patch: &PropPatch) -> Result<Statement, IdentError> {
+    let var = format!("n_upd_{}", id.0);
     let id_key = format!("id_{}", id.0);
     let mut sets = vec![];
     let mut removes = vec![];
@@ -72,24 +73,28 @@ pub fn emit_update_node(id: NodeId, patch: &PropPatch) -> Result<Statement, Iden
         match val {
             Some(v) => {
                 let pkey = format!("set_{}_{}", id.0, n);
-                sets.push(format!("SET n.`{n}` = ${pkey}"));
+                sets.push(format!("SET {var}.`{n}` = ${pkey}"));
                 params.push((pkey, v.clone()));
             }
-            None => removes.push(format!("REMOVE n.`{n}`")),
+            None => removes.push(format!("REMOVE {var}.`{n}`")),
         }
     }
     let body = sets.into_iter().chain(removes).collect::<Vec<_>>().join(" ");
     let cypher = format!(
-        "MATCH (n) WHERE id(n) = ${id_key} {body}"
+        "MATCH ({var}) WHERE id({var}) = ${id_key} {body}"
     );
     Ok(Statement::new(cypher, params))
 }
 
 pub fn emit_delete_node(id: NodeId, cascade: CascadeRule) -> Result<Statement, IdentError> {
+    let var = format!("n_del_{}", id.0);
     let id_key = format!("id_{}", id.0);
-    let action = match cascade { CascadeRule::Detach => "DETACH DELETE n", CascadeRule::Strict => "DELETE n" };
+    let action = match cascade {
+        CascadeRule::Detach => format!("DETACH DELETE {var}"),
+        CascadeRule::Strict => format!("DELETE {var}"),
+    };
     Ok(Statement::new(
-        format!("MATCH (n) WHERE id(n) = ${id_key} {action}"),
+        format!("MATCH ({var}) WHERE id({var}) = ${id_key} {action}"),
         [(id_key, PropValue::Int(id.0))],
     ))
 }
@@ -117,22 +122,22 @@ mod tests {
             .set("a", PropValue::Int(1))
             .unset("b");
         let s = emit_update_node(NodeId(42), &patch).unwrap();
-        assert!(s.cypher.contains("MATCH (n) WHERE id(n) = $id_42"));
-        assert!(s.cypher.contains("SET n.`a` = $set_42_a"));
-        assert!(s.cypher.contains("REMOVE n.`b`"));
+        assert!(s.cypher.contains("MATCH (n_upd_42) WHERE id(n_upd_42) = $id_42"));
+        assert!(s.cypher.contains("SET n_upd_42.`a` = $set_42_a"));
+        assert!(s.cypher.contains("REMOVE n_upd_42.`b`"));
         assert_eq!(s.params.get("id_42"), Some(&PropValue::Int(42)));
     }
 
     #[test]
     fn delete_node_detach() {
         let s = emit_delete_node(NodeId(5), CascadeRule::Detach).unwrap();
-        assert!(s.cypher.contains("DETACH DELETE n"));
+        assert!(s.cypher.contains("MATCH (n_del_5) WHERE id(n_del_5) = $id_5 DETACH DELETE n_del_5"));
     }
 
     #[test]
     fn delete_node_strict() {
         let s = emit_delete_node(NodeId(5), CascadeRule::Strict).unwrap();
-        assert!(s.cypher.contains("DELETE n"));
+        assert!(s.cypher.contains("MATCH (n_del_5) WHERE id(n_del_5) = $id_5 DELETE n_del_5"));
         assert!(!s.cypher.contains("DETACH"));
     }
 }

@@ -1,19 +1,29 @@
 ---
 source: crates/kg-core/tests/emit_snapshots.rs
-expression: stmts
+expression: out
 ---
-[
-  {
-    "cypher": "CREATE CONSTRAINT IF NOT EXISTS FOR (n:`Person`) REQUIRE (n.`name`) IS UNIQUE",
-    "params": {}
-  },
-  {
-    "cypher": "CREATE INDEX IF NOT EXISTS FOR (n:`Person`) ON (n.`age`)",
-    "params": {}
-  },
-  {
-    "cypher": "CREATE (n_1:`Person` $props_n_1)",
+{
+  "ddl": [
+    {
+      "cypher": "CREATE CONSTRAINT IF NOT EXISTS FOR (n:`Person`) REQUIRE (n.`name`) IS UNIQUE",
+      "params": {}
+    },
+    {
+      "cypher": "CREATE INDEX IF NOT EXISTS FOR (n:`Person`) ON (n.`age`)",
+      "params": {}
+    }
+  ],
+  "data": {
+    "cypher": "CREATE (n_1:`Person` $props_n_1)\nWITH *\nCREATE (n_2:`Person` $props_n_2)\nWITH *\nCREATE (n_1)-[r_3:`KNOWS` $props_r_3]->(n_2)\nWITH *\nMATCH (n_upd_42) WHERE id(n_upd_42) = $id_42 SET n_upd_42.`nick` = $set_42_nick REMOVE n_upd_42.`dead`\nWITH *\nMATCH (n_del_99) WHERE id(n_del_99) = $id_99 DETACH DELETE n_del_99",
     "params": {
+      "id_42": {
+        "kind": "int",
+        "value": 42
+      },
+      "id_99": {
+        "kind": "int",
+        "value": 99
+      },
       "props_n_1": {
         "kind": "map",
         "value": {
@@ -22,12 +32,7 @@ expression: stmts
             "value": "Alice"
           }
         }
-      }
-    }
-  },
-  {
-    "cypher": "CREATE (n_2:`Person` $props_n_2)",
-    "params": {
+      },
       "props_n_2": {
         "kind": "map",
         "value": {
@@ -36,12 +41,7 @@ expression: stmts
             "value": "Bob"
           }
         }
-      }
-    }
-  },
-  {
-    "cypher": "CREATE (n_1)-[r_3:`KNOWS` $props_r_3]->(n_2)",
-    "params": {
+      },
       "props_r_3": {
         "kind": "map",
         "value": {
@@ -50,29 +50,11 @@ expression: stmts
             "value": 2020
           }
         }
-      }
-    }
-  },
-  {
-    "cypher": "MATCH (n) WHERE id(n) = $id_42 SET n.`nick` = $set_42_nick REMOVE n.`dead`",
-    "params": {
-      "id_42": {
-        "kind": "int",
-        "value": 42
       },
       "set_42_nick": {
         "kind": "string",
         "value": "X"
       }
     }
-  },
-  {
-    "cypher": "MATCH (n) WHERE id(n) = $id_99 DETACH DELETE n",
-    "params": {
-      "id_99": {
-        "kind": "int",
-        "value": 99
-      }
-    }
   }
-]
+}

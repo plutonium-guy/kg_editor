@@ -118,6 +118,8 @@ async fn query_i64(
 
 #[tokio::test(flavor = "multi_thread")]
 async fn create_two_nodes_and_a_rel() {
+    use std::collections::BTreeMap;
+
     let (client, _container) = client_via_env_or_container().await;
 
     let mut uow = client.unit_of_work();
@@ -125,6 +127,15 @@ async fn create_two_nodes_and_a_rel() {
     let b = uow.create_node(["Person"], [("name", PropValue::from("Bob"))]);
     uow.create_rel(a, b, "KNOWS", [("since", PropValue::Int(2020))]);
     client.commit(uow).await.expect("commit");
+
+    let counts: Vec<BTreeMap<String, PropValue>> = client.query(
+        "MATCH (p:Person) WITH count(p) AS n_count \
+         MATCH ()-[r:KNOWS]->() RETURN n_count, count(r) AS r_count",
+        Vec::<(String, PropValue)>::new(),
+    ).await.unwrap();
+    assert_eq!(counts.len(), 1);
+    assert_eq!(counts[0].get("n_count"), Some(&PropValue::Int(2)));
+    assert_eq!(counts[0].get("r_count"), Some(&PropValue::Int(1)));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -543,22 +554,11 @@ async fn fetch_rel_returns_rel() {
 }
 
 /// 9. server_endpoint_rel_creation
-/// Exercises the `endpoint()` helper's server-id path in cypher/rels.rs using
-/// two pre-existing nodes whose server ids are captured via RETURN queries.
-///
-/// # Design note (phase-0 limitation)
-/// The original spec called for mixing NodeRef::Server (Alice) and NodeRef::Local
-/// (Bob created in the same UoW) in one transaction.  However, the phase-0 emitter
-/// lowers each StagedOp into a *separate* Cypher statement executed with a shared
-/// transaction handle.  Cypher variable bindings do NOT persist across statement
-/// boundaries — so the `n_<local_id>` variable introduced by the CreateNode
-/// statement is not in scope when the subsequent CreateRel statement runs.  This
-/// is a known phase-0 gap (tracked) and is outside the scope of these tests.
-///
-/// Using two Server endpoints still exercises the exact same code branch
-/// (`NodeRef::Server` arm of `endpoint()`) that the spec aimed to cover, and the
-/// emitted Cypher now contains two MATCH preludes — the path that was completely
-/// untested before.
+/// Exercises Local+Server mixing in a single UoW transaction.
+/// Alice is created via raw Cypher (Server endpoint); Bob is created via
+/// UoW create_node (Local). A rel is created from Server(alice) to Local(bob)
+/// in the same UoW. With the WITH * chaining fix, variable bindings persist
+/// across clauses so this now works correctly.
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "native")]
 async fn server_endpoint_rel_creation() {
@@ -567,7 +567,7 @@ async fn server_endpoint_rel_creation() {
 
     let (client, _c) = client_via_env_or_container().await;
 
-    // Create Alice and Bob via raw Cypher, capture both server ids
+    // Create Alice via raw Cypher; capture her server id.
     let alice_id = query_i64(
         &client,
         "CREATE (n:Person {name:'AliceS'}) RETURN id(n) AS id",
@@ -576,27 +576,17 @@ async fn server_endpoint_rel_creation() {
     )
     .await;
 
-    let bob_id = query_i64(
-        &client,
-        "CREATE (n:Person {name:'BobS'}) RETURN id(n) AS id",
-        [] as [(String, PropValue); 0],
-        "id",
-    )
-    .await;
-
-    // Create rel from Server(alice) to Server(bob) via UoW.
-    // This emits: MATCH (n_start_1) WHERE id(n_start_1) = $id_start_1
-    //             MATCH (n_end_1)   WHERE id(n_end_1)   = $id_end_1
-    //             CREATE (n_start_1)-[r_1:KNOWS $props_r_1]->(n_end_1)
-    // — both Server endpoint preludes are exercised.
+    // In one UoW: create Bob (Local) and a rel from Server(alice) -> Local(bob).
+    // The WITH * fix ensures n_<bob_local> is in scope when the CreateRel clause runs.
     let mut uow = client.unit_of_work();
+    let bob_local = uow.create_node(["Person"], [("name", PropValue::from("BobS"))]);
     uow.create_rel(
         NodeRef::Server(NodeId(alice_id)),
-        NodeRef::Server(NodeId(bob_id)),
+        NodeRef::Local(bob_local),
         "KNOWS",
         [("since", PropValue::Int(2025))],
     );
-    client.commit(uow).await.expect("rel commit via server endpoints");
+    client.commit(uow).await.expect("rel commit via Local+Server mix");
 
     // Verify the rel exists and connects Alice → Bob
     let rows: Vec<BTreeMap<String, PropValue>> = client

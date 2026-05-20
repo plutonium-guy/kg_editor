@@ -25,6 +25,6 @@ fn snapshot_full_uow() {
     );
     uow.delete_node(NodeId(99), CascadeRule::Detach);
 
-    let stmts = CypherEmitter::emit(&uow).unwrap();
-    insta::assert_json_snapshot!(stmts);
+    let out = CypherEmitter::emit(&uow).unwrap();
+    insta::assert_json_snapshot!(out);
 }
