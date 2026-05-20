@@ -166,6 +166,32 @@ async fn create_entity_validates_and_persists() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn get_and_delete_entity() {
+    let (base, _c) = start_server().await;
+    let cli = reqwest::Client::new();
+    let r = cli.post(format!("{base}/entities")).json(&serde_json::json!({
+        "label": "Person", "props": {"name": "Frank", "role": "engineer"}
+    })).send().await.unwrap();
+    let v: serde_json::Value = r.json().await.unwrap();
+    let id = v["id"].as_i64().unwrap();
+
+    // GET
+    let r = cli.get(format!("{base}/entities/{id}")).send().await.unwrap();
+    assert!(r.status().is_success());
+    let v: serde_json::Value = r.json().await.unwrap();
+    assert_eq!(v["id"].as_i64().unwrap(), id);
+    assert!(v["labels"].as_array().unwrap().iter().any(|l| l == "Person"));
+
+    // DELETE
+    let r = cli.delete(format!("{base}/entities/{id}?cascade=true")).send().await.unwrap();
+    assert!(r.status().is_success());
+
+    // GET again — 404
+    let r = cli.get(format!("{base}/entities/{id}")).send().await.unwrap();
+    assert_eq!(r.status().as_u16(), 404);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn update_entity_set_and_unset() {
     let (base, _c) = start_server().await;
     let cli = reqwest::Client::new();

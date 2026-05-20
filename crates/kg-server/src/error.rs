@@ -12,6 +12,7 @@ impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let status = match self.code.as_str() {
             c if c.starts_with("400.") => StatusCode::BAD_REQUEST,
+            c if c.starts_with("404.") => StatusCode::NOT_FOUND,
             c if c.starts_with("422.") => StatusCode::UNPROCESSABLE_ENTITY,
             c if c.starts_with("502.") => StatusCode::BAD_GATEWAY,
             _ => StatusCode::INTERNAL_SERVER_ERROR,

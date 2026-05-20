@@ -1,4 +1,4 @@
-use axum::{extract::{Path, State}, Json};
+use axum::{extract::{Path, Query, State}, Json};
 use kg_core::value::PropValue;
 use kg_schema::FieldType;
 use serde::{Deserialize, Serialize};
@@ -253,4 +253,64 @@ pub(crate) fn prop_to_json(v: &PropValue) -> serde_json::Value {
         Duration { seconds, nanos } => serde_json::json!({"seconds": seconds, "nanos": nanos}),
         Point2D { srid, x, y } => serde_json::json!({"srid": srid, "x": x, "y": y}),
     }
+}
+
+// ── DELETE /entities/:id ─────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+pub struct DeleteParams {
+    #[serde(default)]
+    pub cascade: bool,
+}
+
+pub async fn delete(
+    State(s): State<AppState>,
+    Path(id): Path<i64>,
+    Query(p): Query<DeleteParams>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let cypher = if p.cascade {
+        "MATCH (n) WHERE id(n) = $id DETACH DELETE n"
+    } else {
+        "MATCH (n) WHERE id(n) = $id DELETE n"
+    };
+    s.client.query::<BTreeMap<String, PropValue>>(cypher, [("id", PropValue::Int(id))]).await.map_err(ApiError::from)?;
+    Ok(Json(serde_json::json!({"ok": true})))
+}
+
+// ── GET /entities/:id ────────────────────────────────────────────────────────
+
+pub async fn get_one(
+    State(s): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let rows = s.client.query::<BTreeMap<String, PropValue>>(
+        "MATCH (n) WHERE id(n) = $id \
+         OPTIONAL MATCH (n)-[r_out]->(t) \
+         OPTIONAL MATCH (src)-[r_in]->(n) \
+         RETURN id(n) AS id, labels(n) AS labels, properties(n) AS props, \
+                collect(DISTINCT {id: id(r_out), type: type(r_out), target_id: id(t), target_labels: labels(t), props: properties(r_out)}) AS out_rels, \
+                collect(DISTINCT {id: id(r_in), type: type(r_in), source_id: id(src), source_labels: labels(src), props: properties(r_in)}) AS in_rels",
+        [("id", PropValue::Int(id))],
+    ).await.map_err(ApiError::from)?;
+    let row = rows.into_iter().next().ok_or_else(|| ApiError {
+        code: "404.not_found".into(), message: format!("no node with id {id}"),
+    })?;
+
+    // Filter out null-rel entries (caused by OPTIONAL MATCH with no match).
+    let filter_rels = |v: serde_json::Value| -> serde_json::Value {
+        if let serde_json::Value::Array(arr) = v {
+            serde_json::Value::Array(
+                arr.into_iter().filter(|x| !matches!(x.get("id"), Some(serde_json::Value::Null) | None)).collect()
+            )
+        } else { v }
+    };
+
+    let body = serde_json::json!({
+        "id": id,
+        "labels": prop_to_json(row.get("labels").unwrap_or(&PropValue::Null)),
+        "props": prop_to_json(row.get("props").unwrap_or(&PropValue::Null)),
+        "out_rels": filter_rels(prop_to_json(row.get("out_rels").unwrap_or(&PropValue::Null))),
+        "in_rels": filter_rels(prop_to_json(row.get("in_rels").unwrap_or(&PropValue::Null))),
+    });
+    Ok(Json(body))
 }
