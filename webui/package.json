@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "e2e": "playwright test",
     "lint": "tsc -b --noEmit"
   },
   "dependencies": {
@@ -25,6 +26,7 @@
     "zustand": "^4.5.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/cytoscape": "^3.21.0",
     "@types/jsdom": "^28.0.3",
     "@types/react": "^18.3.5",
