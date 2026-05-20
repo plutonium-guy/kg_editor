@@ -1,4 +1,6 @@
 use kg_neo4j::{auth::basic, ClientBuilder};
+use kg_schema::SchemaFile;
+use std::io::Write;
 use std::sync::Arc;
 use testcontainers::{
     core::{ContainerPort, WaitFor},
@@ -36,8 +38,16 @@ async fn start_server() -> (String, Option<ContainerAsync<GenericImage>>) {
         .build()
         .await
         .expect("connect");
+
+    // Write the example schema to a temp file and parse.
+    let yaml = include_str!("../../../kg-schema.yaml");
+    let mut tmp = tempfile::NamedTempFile::new().expect("tempfile");
+    tmp.write_all(yaml.as_bytes()).expect("write yaml");
+    let schema = SchemaFile::from_yaml(tmp.path()).expect("parse schema");
+
     let state = kg_server::state::AppState {
         client: Arc::new(client),
+        schema: Arc::new(schema),
     };
     let app = kg_server::router(state);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

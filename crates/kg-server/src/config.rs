@@ -7,6 +7,7 @@ pub struct Config {
     pub neo4j_password: String,
     pub cors_origins: Vec<String>,
     pub serve_ui_from: Option<String>,
+    pub schema_path: String,
 }
 
 impl Config {
@@ -20,6 +21,7 @@ impl Config {
             neo4j_password: std::env::var("NEO4J_PASSWORD").expect("NEO4J_PASSWORD env var required"),
             cors_origins: cors.split(',').map(|s| s.trim().to_string()).collect(),
             serve_ui_from: std::env::var("KG_SERVE_UI").ok(),
+            schema_path: std::env::var("KG_SCHEMA").expect("KG_SCHEMA env var required (path to kg-schema.yaml)"),
         }
     }
 }
