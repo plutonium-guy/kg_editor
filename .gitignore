@@ -1,21 +1,20 @@
-target/
-Cargo.lock
-**/*.rs.bk
-.DS_Store
-crates/*/Cargo.lock
-examples/wasm_crud/pkg/
-node_modules/
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/bin/
+/dist/
+vendor/
 
 # webui
 webui/node_modules/
 webui/dist/
-webui/pkg/
 webui/test-results/
 webui/playwright-report/
 
-# wasm-pack output
-crates/kg-core-wasm/pkg/
-
-# Build artifacts for new crates
-crates/kg-mcp/target/
-crates/kg-schema/target/
+# macOS
+.DS_Store

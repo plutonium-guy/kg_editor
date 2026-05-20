@@ -1,32 +1,26 @@
-.PHONY: neo4j-up neo4j-down test-core test-native test-wasm fmt clippy doc wasm-build webui-dev webui-build kg-server-run
+.PHONY: neo4j-up neo4j-down go-build go-test go-test-int kg-server-run kg-mcp-run webui-dev webui-build fmt lint
 
 neo4j-up:
 	docker run -d --name kg-neo4j -p 7687:7687 -p 7474:7474 \
-		-e NEO4J_AUTH=neo4j/test neo4j:5-community
+		-e NEO4J_AUTH=neo4j/testtest neo4j:5-community
 
 neo4j-down:
 	docker rm -f kg-neo4j
 
-test-core:
-	cargo test -p kg-core
+go-build:
+	go build ./...
 
-test-native:
-	cargo test -p kg-neo4j --features native
+go-test:
+	go test ./internal/schema/... ./internal/api/...
 
-test-wasm:
-	wasm-pack test --headless --chrome crates/kg-neo4j --features wasm
+go-test-int:
+	go test -tags=integration ./...
 
-fmt:
-	cargo fmt --all
+kg-server-run:
+	KG_SCHEMA=$(PWD)/kg-schema.yaml NEO4J_PASSWORD=testtest go run ./cmd/kg-server
 
-clippy:
-	cargo clippy --all-targets --all-features -- -D warnings
-
-doc:
-	cargo doc --no-deps --all-features
-
-wasm-build:
-	cd crates/kg-core-wasm && wasm-pack build --target web --out-dir ../../webui/pkg
+kg-mcp-run:
+	KG_SERVER_URL=http://localhost:9000 go run ./cmd/kg-mcp
 
 webui-dev:
 	cd webui && npm run dev
@@ -34,5 +28,8 @@ webui-dev:
 webui-build:
 	cd webui && npm run build
 
-kg-server-run:
-	cargo run -p kg-server
+fmt:
+	gofmt -w .
+
+lint:
+	go vet ./...
