@@ -9,6 +9,7 @@ import { X } from "lucide-react";
 interface PickerProps {
   fromId: number;
   fromLabel: string;
+  initialTarget?: { id: number; label: string };
   onStage: (type: string, targetId: number, props: Record<string, unknown>) => void;
   onClose: () => void;
 }
@@ -16,7 +17,7 @@ interface PickerProps {
 export default function RelationshipPicker(p: PickerProps) {
   const { data: schema } = useSchema();
   const [type, setType] = useState<string | null>(null);
-  const [target, setTarget] = useState<{ id: number; label: string } | null>(null);
+  const [target, setTarget] = useState<{ id: number; label: string } | null>(p.initialTarget ?? null);
 
   if (!schema) return null;
   // Only show rel types whose first endpoint label matches fromLabel.
