@@ -2,6 +2,9 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { search } from "../kg/client";
+import { Input } from "../components/ui/input";
+import { Badge } from "../components/ui/badge";
+import { Search as SearchIcon } from "lucide-react";
 
 export default function SearchPage() {
   const [q, setQ] = useState("");
@@ -11,26 +14,31 @@ export default function SearchPage() {
     enabled: q.length >= 1,
   });
   return (
-    <div style={{ padding: 24, maxWidth: 800, margin: "0 auto" }}>
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="Search across all entities…"
-        autoFocus
-        style={{ width: "100%", padding: "10px 12px", fontSize: 16, border: "1px solid #d1d5db", borderRadius: 6 }}
-      />
-      {isLoading && <p style={{ color: "#6b7280" }}>Searching…</p>}
-      <ul style={{ marginTop: 12, padding: 0, listStyle: "none" }}>
+    <div className="p-6 max-w-3xl mx-auto">
+      <div className="relative">
+        <SearchIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <Input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search across all entities…"
+          autoFocus
+          className="pl-9 h-11 text-base"
+        />
+      </div>
+      {isLoading && <p className="mt-4 text-sm text-slate-500">Searching…</p>}
+      {q.length >= 1 && data && data.length === 0 && !isLoading && (
+        <p className="mt-4 text-sm text-slate-500">No matches.</p>
+      )}
+      <ul className="mt-4 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
         {(data ?? []).map((e) => (
-          <li key={e.id} style={{ padding: "8px 0", borderBottom: "1px solid #e5e7eb" }}>
-            <Link to={`/entity/${e.id}`} style={{ color: "#2563eb", textDecoration: "none" }}>
-              <strong>{e.labels[0]}</strong> — {String(e.props.name ?? e.id)}
+          <li key={e.id} className="px-4 py-3 hover:bg-slate-50">
+            <Link to={`/entity/${e.id}`} className="flex items-center gap-3">
+              <Badge tone="blue">{e.labels[0]}</Badge>
+              <span className="font-medium text-slate-900">{String(e.props.name ?? e.id)}</span>
+              <span className="text-slate-400 text-sm ml-auto">#{e.id}</span>
             </Link>
           </li>
         ))}
-        {q.length >= 1 && data && data.length === 0 && !isLoading && (
-          <li style={{ color: "#6b7280", padding: "8px 0" }}>No matches.</li>
-        )}
       </ul>
     </div>
   );

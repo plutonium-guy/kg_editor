@@ -2,6 +2,9 @@ import { useState } from "react";
 import { useSchema } from "../hooks/useSchema";
 import { useEntities } from "../hooks/useEntities";
 import EntityForm from "./EntityForm";
+import { Input } from "./ui/input";
+import { Badge } from "./ui/badge";
+import { X } from "lucide-react";
 
 interface PickerProps {
   fromId: number;
@@ -22,47 +25,65 @@ export default function RelationshipPicker(p: PickerProps) {
   );
 
   return (
-    <div role="dialog" aria-modal="true" style={{
-      position: "fixed", top: 0, right: 0, width: 420, height: "100vh",
-      background: "#fff", borderLeft: "1px solid #d1d5db", padding: 16,
-      overflow: "auto", boxShadow: "-4px 0 12px rgba(0,0,0,0.08)", zIndex: 40,
-    }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h3 style={{ margin: 0 }}>Link from {p.fromLabel} #{p.fromId}</h3>
-        <button onClick={p.onClose} style={closeBtn}>×</button>
+    <div className="fixed top-14 right-0 z-50 w-[420px] h-[calc(100vh-3.5rem)] bg-white border-l border-slate-200 shadow-xl overflow-auto">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200">
+        <h2 className="font-semibold text-slate-900">Link from <Badge tone="blue">{p.fromLabel} #{p.fromId}</Badge></h2>
+        <button onClick={p.onClose} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
       </div>
 
-      <section style={{ marginTop: 16 }}>
-        <div style={label}>1. Relationship type</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
-          {allowedTypes.length === 0 && <span style={{ color: "#6b7280", fontSize: 13 }}>No relationship types defined from {p.fromLabel}.</span>}
-          {allowedTypes.map(([t]) => (
-            <button key={t} onClick={() => { setType(t); setTarget(null); }} style={t === type ? typeBtnActive : typeBtn}>{t}</button>
-          ))}
-        </div>
-      </section>
+      <div className="p-5 space-y-5">
+        <Step n={1} title="Relationship type">
+          {allowedTypes.length === 0 ? (
+            <p className="text-sm text-slate-500">No relationship types defined from {p.fromLabel}.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {allowedTypes.map(([t]) => (
+                <button
+                  key={t}
+                  onClick={() => { setType(t); setTarget(null); }}
+                  className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
+                    t === type
+                      ? "bg-blue-100 text-blue-700 border border-blue-300 font-medium"
+                      : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
+                  }`}
+                >{t}</button>
+              ))}
+            </div>
+          )}
+        </Step>
 
-      {type && schema.rels[type] && (
-        <section style={{ marginTop: 16 }}>
-          <div style={label}>2. Target {schema.rels[type].endpoints.find(([s]) => s === p.fromLabel)?.[1] ?? ""}</div>
-          <TargetPicker
-            allowedLabel={schema.rels[type].endpoints.find(([s]) => s === p.fromLabel)?.[1] ?? ""}
-            onChoose={setTarget}
-            chosen={target}
-          />
-        </section>
-      )}
+        {type && schema.rels[type] && (
+          <Step n={2} title={`Target ${schema.rels[type].endpoints.find(([s]) => s === p.fromLabel)?.[1] ?? ""}`}>
+            <TargetPicker
+              allowedLabel={schema.rels[type].endpoints.find(([s]) => s === p.fromLabel)?.[1] ?? ""}
+              onChoose={setTarget}
+              chosen={target}
+            />
+          </Step>
+        )}
 
-      {type && target && schema.rels[type] && (
-        <section style={{ marginTop: 16 }}>
-          <div style={label}>3. Properties (optional)</div>
-          <EntityForm
-            fields={schema.rels[type].props}
-            submitLabel="Stage link"
-            onSubmit={(values) => { p.onStage(type, target.id, values); p.onClose(); }}
-          />
-        </section>
-      )}
+        {type && target && schema.rels[type] && (
+          <Step n={3} title="Properties (optional)">
+            <EntityForm
+              fields={schema.rels[type].props}
+              submitLabel="Stage link"
+              onSubmit={(values) => { p.onStage(type, target.id, values); p.onClose(); }}
+            />
+          </Step>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-200 text-slate-700 mr-2 text-[10px]">{n}</span>
+        {title}
+      </h3>
+      {children}
     </div>
   );
 }
@@ -78,26 +99,16 @@ function TargetPicker({
   const { data } = useEntities(allowedLabel, q || undefined, 10);
   return (
     <div>
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder={`Search ${allowedLabel}…`}
-        style={{ width: "100%", padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: 4 }}
-      />
-      <ul style={{ maxHeight: 180, overflow: "auto", margin: "6px 0 0", padding: 0, listStyle: "none", border: "1px solid #e5e7eb", borderRadius: 4 }}>
+      <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${allowedLabel}…`} />
+      <ul className="mt-2 max-h-44 overflow-auto rounded-md border border-slate-200 divide-y divide-slate-100">
+        {(data ?? []).length === 0 && <li className="px-3 py-2 text-sm text-slate-400">No matches.</li>}
         {(data ?? []).map((e) => {
           const isChosen = chosen?.id === e.id;
           return (
             <li
               key={e.id}
               onClick={() => onChoose({ id: e.id, label: allowedLabel })}
-              style={{
-                padding: "6px 8px",
-                cursor: "pointer",
-                background: isChosen ? "#dbeafe" : "transparent",
-                borderBottom: "1px solid #f3f4f6",
-                fontSize: 14,
-              }}
+              className={`px-3 py-2 text-sm cursor-pointer ${isChosen ? "bg-blue-50 text-blue-700 font-medium" : "hover:bg-slate-50 text-slate-700"}`}
             >
               {String(e.props.name ?? e.id)}
             </li>
@@ -108,12 +119,3 @@ function TargetPicker({
   );
 }
 
-const closeBtn: React.CSSProperties = {
-  background: "transparent", border: 0, fontSize: 20, cursor: "pointer", padding: "0 8px",
-};
-const label: React.CSSProperties = { fontSize: 13, color: "#374151", fontWeight: 600 };
-const typeBtn: React.CSSProperties = {
-  padding: "4px 10px", background: "#fff", border: "1px solid #d1d5db",
-  borderRadius: 4, cursor: "pointer", fontSize: 13,
-};
-const typeBtnActive: React.CSSProperties = { ...typeBtn, background: "#dbeafe", borderColor: "#2563eb", fontWeight: 600 };

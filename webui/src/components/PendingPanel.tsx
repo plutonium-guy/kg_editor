@@ -3,6 +3,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useStore } from "../state/store";
 import { describe, type PendingOp, type RefHandle } from "../kg/pending";
 import * as api from "../kg/client";
+import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
+import { X } from "lucide-react";
 
 export default function PendingPanel() {
   const { pending, remove, clear } = useStore();
@@ -31,31 +34,28 @@ export default function PendingPanel() {
   };
 
   return (
-    <div style={{
-      position: "fixed", left: 0, right: 0, bottom: 0,
-      background: "#fef3c7", borderTop: "2px solid #d97706",
-      padding: "12px 16px", boxShadow: "0 -2px 8px rgba(0,0,0,0.08)",
-      maxHeight: "40vh", overflow: "auto",
-      zIndex: 50,
-    }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-        <strong style={{ color: "#92400e" }}>{pending.length} pending change{pending.length !== 1 ? "s" : ""}</strong>
-        <div>
-          <button onClick={() => clear()} disabled={running} style={btnSecondary}>Discard all</button>{" "}
-          <button onClick={commit} disabled={running} style={btnPrimary}>
+    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-amber-300 bg-amber-50 shadow-lg max-h-[40vh] overflow-auto">
+      <div className="px-6 py-3 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Badge tone="amber">{pending.length} pending</Badge>
+          <span className="text-sm text-amber-900">unsaved changes</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => clear()} disabled={running}>Discard all</Button>
+          <Button variant="primary" size="sm" onClick={commit} disabled={running}>
             {running ? "Committing…" : "Commit all"}
-          </button>
+          </Button>
         </div>
       </div>
-      <ul style={{ margin: 0, paddingLeft: 18, color: "#78350f" }}>
+      <ul className="px-6 pb-3 space-y-1">
         {pending.map((op, i) => (
-          <li key={i} style={{ padding: "2px 0" }}>
-            {describe(op)}{" "}
-            <button onClick={() => remove(i)} disabled={running} style={btnRemove}>×</button>
+          <li key={i} className="flex items-center justify-between text-sm text-amber-900 bg-amber-100/60 rounded px-3 py-1.5">
+            <span>{describe(op)}</span>
+            <button onClick={() => remove(i)} disabled={running} className="text-amber-700 hover:text-amber-900"><X size={14} /></button>
           </li>
         ))}
       </ul>
-      {err && <div style={{ color: "#dc2626", marginTop: 8, fontSize: 13 }}>{err}</div>}
+      {err && <div className="px-6 pb-3 text-sm text-red-700">{err}</div>}
     </div>
   );
 }
@@ -85,15 +85,3 @@ function resolveRef(r: RefHandle, tmpToId: Record<string, number>): number {
   if (id == null) throw new Error(`unresolved tmpId in link: ${r.ref}`);
   return id;
 }
-
-const btnPrimary: React.CSSProperties = {
-  padding: "6px 14px", background: "#d97706", color: "#fff", border: 0,
-  borderRadius: 4, cursor: "pointer", fontWeight: 600,
-};
-const btnSecondary: React.CSSProperties = {
-  padding: "6px 14px", background: "transparent", color: "#92400e", border: "1px solid #d97706",
-  borderRadius: 4, cursor: "pointer",
-};
-const btnRemove: React.CSSProperties = {
-  background: "transparent", border: 0, color: "#92400e", cursor: "pointer", fontSize: 16, padding: 0, marginLeft: 4,
-};

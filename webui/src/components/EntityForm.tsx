@@ -3,6 +3,8 @@ import { useForm, type FieldErrors } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { FieldSpec } from "../kg/schema";
+import { Input, Select } from "./ui/input";
+import { Button } from "./ui/button";
 
 interface Props {
   fields: FieldSpec[];
@@ -19,7 +21,7 @@ export default function EntityForm({ fields, initial, onSubmit, submitLabel = "S
   });
 
   return (
-    <form onSubmit={handleSubmit((v) => onSubmit(coerceForSubmit(v, fields)))} style={{ display: "grid", gap: 12 }}>
+    <form onSubmit={handleSubmit((v) => onSubmit(coerceForSubmit(v, fields)))} className="space-y-4">
       {fields.map((f) => (
         <FieldInput
           key={f.name}
@@ -28,9 +30,7 @@ export default function EntityForm({ fields, initial, onSubmit, submitLabel = "S
           error={(errors as FieldErrors)[f.name]?.message as string | undefined}
         />
       ))}
-      <button type="submit" style={{
-        padding: "8px 16px", background: "#1f2937", color: "#fff", border: 0, borderRadius: 4, cursor: "pointer", justifySelf: "start",
-      }}>{submitLabel}</button>
+      <Button type="submit" variant="primary">{submitLabel}</Button>
     </form>
   );
 }
@@ -46,6 +46,7 @@ function buildZodSchema(fields: FieldSpec[]): z.ZodTypeAny {
       case "bool":  s = z.coerce.boolean(); break;
       case "enum":  s = f.values.length > 0 ? z.enum(f.values as [string, ...string[]]) : z.string(); break;
       case "ref":   s = z.coerce.number().int(); break;
+      default: s = z.unknown();
     }
     if (!f.required) s = s.optional().or(z.literal(""));
     shape[f.name] = s;
@@ -75,54 +76,42 @@ function FieldInput({ field, register, error }: FieldInputProps) {
   let input: React.ReactElement;
   switch (field.type) {
     case "string":
-      input = <input id={id} {...register(field.name)} style={inputStyle} />;
+      input = <Input id={id} {...register(field.name)} />;
       break;
     case "int":
     case "float":
-      input = <input id={id} type="number" step={field.type === "int" ? 1 : "any"} {...register(field.name)} style={inputStyle} />;
+      input = <Input id={id} type="number" step={field.type === "int" ? 1 : "any"} {...register(field.name)} />;
       break;
     case "ref":
-      input = <input id={id} type="number" step={1} {...register(field.name)} style={inputStyle} placeholder={`id of ${(field as { label?: string }).label}`} />;
+      input = <Input id={id} type="number" step={1} {...register(field.name)} placeholder={`id of ${(field as { label?: string }).label ?? ""}`} />;
       break;
     case "bool":
-      input = <input id={id} type="checkbox" {...register(field.name)} />;
+      input = <input id={id} type="checkbox" className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" {...register(field.name)} />;
       break;
     case "date":
-      input = <input id={id} type="date" {...register(field.name)} style={inputStyle} />;
+      input = <Input id={id} type="date" {...register(field.name)} />;
       break;
     case "date_time":
-      input = <input id={id} type="datetime-local" {...register(field.name)} style={inputStyle} />;
+      input = <Input id={id} type="datetime-local" {...register(field.name)} />;
       break;
     case "enum":
       input = (
-        <select id={id} {...register(field.name)} style={inputStyle}>
+        <Select id={id} {...register(field.name)}>
           <option value="">(unset)</option>
           {field.values.map((v) => <option key={v} value={v}>{v}</option>)}
-        </select>
+        </Select>
       );
       break;
-    default: {
-      const _exhaustive: never = field;
-      throw new Error(`Unhandled field type: ${JSON.stringify(_exhaustive)}`);
-    }
+    default:
+      input = <Input id={id} {...register((field as FieldSpec).name)} />;
   }
   return (
-    <label htmlFor={id} style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: 8, alignItems: "center" }}>
-      <span style={{ fontSize: 13, color: "#374151" }}>
-        {field.name}{field.required ? <span style={{ color: "#dc2626" }}> *</span> : null}
-      </span>
-      <div>
-        {input}
-        {error && <div style={{ color: "#dc2626", fontSize: 12, marginTop: 4 }}>{error}</div>}
-      </div>
-    </label>
+    <div>
+      <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-1">
+        {field.name}{field.required && <span className="text-red-500"> *</span>}
+      </label>
+      {input}
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+    </div>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  padding: "6px 8px",
-  border: "1px solid #d1d5db",
-  borderRadius: 4,
-  width: "100%",
-  fontSize: 14,
-};
