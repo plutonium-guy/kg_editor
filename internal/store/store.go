@@ -230,6 +230,12 @@ func (s *Store) DeleteLink(ctx context.Context, id int64) error {
 	return s.runVoid(ctx, "MATCH ()-[r]->() WHERE id(r) = $id DELETE r", map[string]any{"id": id})
 }
 
+// Query executes arbitrary read Cypher with params. Used by the /query passthrough.
+// Returns rows as []map[string]any with all values converted to JSON-friendly types.
+func (s *Store) Query(ctx context.Context, cypher string, params map[string]any) ([]map[string]any, error) {
+	return s.runMany(ctx, cypher, params)
+}
+
 // LookupLabels returns the first label of two nodes; used for endpoint validation.
 func (s *Store) LookupLabels(ctx context.Context, startID, endID int64) (string, string, error) {
 	rec, err := s.runSingle(ctx, "MATCH (s) WHERE id(s) = $sid MATCH (e) WHERE id(e) = $eid RETURN labels(s) AS sl, labels(e) AS el", map[string]any{"sid": startID, "eid": endID})

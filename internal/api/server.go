@@ -50,6 +50,7 @@ func Router(d Deps) http.Handler {
 	})
 
 	r.Get("/search", d.search)
+	r.Post("/query", d.query)
 
 	return r
 }
