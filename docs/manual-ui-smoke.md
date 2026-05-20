@@ -3,13 +3,14 @@
 ## Prereqs
 - Docker (Colima: `export DOCKER_HOST=unix://${HOME}/.colima/default/docker.sock`)
 - Node 20+, npm
+- Go 1.26+
 - `make neo4j-up` running
 
 ## Steps
 
 1. Start backend with schema:
    ```
-   KG_SCHEMA=$(pwd)/kg-schema.yaml NEO4J_PASSWORD=testtest cargo run -p kg-server
+   make kg-server-run
    ```
 2. Start webui:
    ```

@@ -1,82 +1,58 @@
 # kg_editor
 
-Rust framework for Neo4j 5.x graph CRUD + linking. Phase 0 ships a pure-logic
-core (`kg-core`) and a Neo4j transport (`kg-neo4j`) that compiles natively
-(Bolt via `neo4rs`) or to `wasm32-unknown-unknown` (HTTP Query API v2 via
-`web-sys::fetch`).
+Browser-based knowledge-graph editor for SMEs (no Cypher knowledge required) + MCP server so AI agents can drive the same graph. Backed by Neo4j 5.
 
-## At a glance
+## Stack
 
-```rust
-use kg_core::{schema::{NodeSchema, PropType, SchemaRegistry}, value::PropValue};
-use kg_neo4j::{auth::basic, ClientBuilder};
+- **Go** backend (`cmd/kg-server`) — chi + neo4j-go-driver/v5; serves the REST API the webui consumes.
+- **Go** MCP server (`cmd/kg-mcp`) — mcp-go over stdio; calls kg-server.
+- **TypeScript + React** webui — Vite, react-router, react-hook-form + zod, @tanstack/react-query, Cytoscape.
+- **YAML schema** (`kg-schema.yaml`) — single source of truth for entity types, relationships, validation rules. Loaded once at server startup.
 
-let mut reg = SchemaRegistry::new();
-reg.add_node(NodeSchema::builder("Person")
-    .prop("name", PropType::String).required().unique(["name"]).build());
+Phase 0–2 Rust implementation lives in git history (`phase-0/kg-editor`, `phase-1/ui`, `phase-2/sme-ai` branches). Replaced by Go in phase 3 for iteration speed + Neo4j driver maturity.
 
-let client = ClientBuilder::new("bolt://localhost:7687")
-    .auth(basic("neo4j","test"))
-    .schema(reg)
-    .build().await?;
-client.materialize_schema().await?;
+## Layout
 
-let mut uow = client.unit_of_work();
-let alice = uow.create_node(["Person"], [("name", PropValue::from("Alice"))]);
-let bob   = uow.create_node(["Person"], [("name", PropValue::from("Bob"))]);
-uow.create_rel(alice, bob, "KNOWS", [] as [(String, PropValue); 0]);
-client.commit(uow).await?;
+```
+.
+├── cmd/
+│   ├── kg-server/       # HTTP API binary
+│   └── kg-mcp/          # MCP stdio binary
+├── internal/
+│   ├── api/             # chi handlers
+│   ├── schema/          # YAML loader + validation
+│   ├── store/           # neo4j driver wrapper
+│   └── mcp/             # MCP tools + REST client
+├── webui/               # Vite + React + TS frontend
+├── kg-schema.yaml       # schema source of truth
+└── docs/                # design / plan / smoke docs
 ```
 
-## Crates
+## Run
 
-| Crate       | Purpose                                                          |
-|-------------|------------------------------------------------------------------|
-| `kg-core`   | Pure types, schema, Unit-of-Work staging, Cypher emitter, no I/O |
-| `kg-neo4j`  | Transports (Bolt or HTTP) and `Client` facade                    |
-
-## Build matrix
-
-### Phase 0 (Rust framework)
-```
-cargo test  -p kg-core
-cargo test  -p kg-neo4j --features native
-wasm-pack test --headless --chrome crates/kg-neo4j --no-default-features --features wasm
-```
-
-### Phase 1 (Browser UI)
 ```
 make neo4j-up
-make wasm-build        # builds kg-core-wasm into webui/pkg
-make kg-server-run     # starts the HTTP proxy on :9000
-make webui-dev         # Vite dev server on :5173
-```
-
-See [Phase 1 design](docs/superpowers/specs/2026-05-20-phase-1-ui-design.md) and [implementation plan](docs/superpowers/plans/2026-05-20-phase-1-ui.md).
-
-### Phase 2 (SME UI + AI MCP)
-```
-make neo4j-up
-KG_SCHEMA=$(pwd)/kg-schema.yaml NEO4J_PASSWORD=testtest cargo run -p kg-server
-cd webui && npm install && npm run dev
+make kg-server-run      # starts on :9000 — needs KG_SCHEMA + NEO4J_PASSWORD env, see Makefile
+make webui-dev          # starts Vite on :5173
 # AI side, separate terminal:
-KG_SERVER_URL=http://localhost:9000 cargo run -p kg-mcp
+make kg-mcp-run         # stdio MCP — wire into Claude per docs/manual-mcp-smoke.md
 ```
 
-See:
-- [Phase 2 design](docs/superpowers/specs/2026-05-20-phase-2-sme-ai-design.md)
-- [Phase 2 plan](docs/superpowers/plans/2026-05-20-phase-2-sme-ai.md)
-- [Manual UI smoke](docs/manual-ui-smoke.md)
-- [Manual MCP smoke](docs/manual-mcp-smoke.md)
+## Test
+
+```
+go test ./internal/schema/... ./internal/mcp/...                                   # unit, no Neo4j
+NEO4J_URI=bolt://localhost:7687 NEO4J_PASSWORD=testtest \
+  go test -tags=integration ./internal/store/... ./internal/api/...                # integration
+cd webui && npm test                                                                # vitest
+cd webui && npm run e2e                                                             # playwright (kg-server must be running)
+```
 
 ## Docs
 
-`cargo doc --no-deps --all-features --open`
-
-See:
-- [Design spec](docs/superpowers/specs/2026-05-19-graph-editor-framework-design.md)
-- [Implementation plan](docs/superpowers/plans/2026-05-19-kg-editor-framework.md)
-- [Manual WASM smoke](docs/manual-smoke.md)
+- [Phase 3 design](docs/superpowers/specs/2026-05-20-phase-3-go-rewrite-design.md)
+- [Manual UI smoke](docs/manual-ui-smoke.md)
+- [Manual MCP smoke](docs/manual-mcp-smoke.md)
 
 ## License
 

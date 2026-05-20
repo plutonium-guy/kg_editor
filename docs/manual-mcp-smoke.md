@@ -12,12 +12,9 @@
    {
      "mcpServers": {
        "kg-editor": {
-         "command": "cargo",
-         "args": [
-           "run", "--manifest-path",
-           "/Volumes/external_storage/kg_editor/Cargo.toml",
-           "-p", "kg-mcp"
-         ],
+         "command": "go",
+         "args": ["run", "./cmd/kg-mcp"],
+         "cwd": "/Volumes/external_storage/kg_editor",
          "env": { "KG_SERVER_URL": "http://localhost:9000" }
        }
      }
