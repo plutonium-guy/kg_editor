@@ -15,3 +15,7 @@ webui/playwright-report/
 
 # wasm-pack output
 crates/kg-core-wasm/pkg/
+
+# Build artifacts for new crates
+crates/kg-mcp/target/
+crates/kg-schema/target/

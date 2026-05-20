@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members  = ["crates/kg-core", "crates/kg-neo4j", "crates/kg-core-wasm", "crates/kg-server", "examples"]
+members  = ["crates/kg-core", "crates/kg-neo4j", "crates/kg-core-wasm", "crates/kg-server", "crates/kg-schema", "crates/kg-mcp", "examples"]
 exclude  = ["examples/wasm_crud", "webui"]
 
 [workspace.package]
@@ -34,3 +34,5 @@ tokio-tungstenite = "0.23"
 tracing      = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 reqwest      = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde_yaml   = "0.9"
+anyhow       = "1"
