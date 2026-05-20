@@ -277,6 +277,63 @@ pub async fn delete(
     Ok(Json(serde_json::json!({"ok": true})))
 }
 
+// ── GET /entities (list) ─────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+pub struct ListParams {
+    pub label: Option<String>,
+    pub q: Option<String>,
+    #[serde(default = "default_limit")]
+    pub limit: i64,
+}
+fn default_limit() -> i64 { 50 }
+
+pub async fn list(
+    State(s): State<AppState>,
+    Query(p): Query<ListParams>,
+) -> Result<Json<Vec<serde_json::Value>>, ApiError> {
+    let (cypher, params): (String, Vec<(String, PropValue)>) = match (p.label.as_deref(), p.q.as_deref()) {
+        (Some(label), Some(q)) => {
+            if !label.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                return Err(ApiError { code: "400.bad_label".into(), message: "label has illegal chars".into() });
+            }
+            (
+                format!("MATCH (n:`{label}`) WHERE any(k IN keys(n) WHERE toLower(toString(n[k])) CONTAINS toLower($q)) RETURN id(n) AS id, labels(n) AS labels, properties(n) AS props LIMIT $lim"),
+                vec![("q".into(), PropValue::String(q.into())), ("lim".into(), PropValue::Int(p.limit))],
+            )
+        }
+        (Some(label), None) => {
+            if !label.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                return Err(ApiError { code: "400.bad_label".into(), message: "label has illegal chars".into() });
+            }
+            (
+                format!("MATCH (n:`{label}`) RETURN id(n) AS id, labels(n) AS labels, properties(n) AS props LIMIT $lim"),
+                vec![("lim".into(), PropValue::Int(p.limit))],
+            )
+        }
+        (None, Some(q)) => (
+            "MATCH (n) WHERE any(k IN keys(n) WHERE toLower(toString(n[k])) CONTAINS toLower($q)) RETURN id(n) AS id, labels(n) AS labels, properties(n) AS props LIMIT $lim".into(),
+            vec![("q".into(), PropValue::String(q.into())), ("lim".into(), PropValue::Int(p.limit))],
+        ),
+        (None, None) => (
+            "MATCH (n) RETURN id(n) AS id, labels(n) AS labels, properties(n) AS props LIMIT $lim".into(),
+            vec![("lim".into(), PropValue::Int(p.limit))],
+        ),
+    };
+    let rows = s.client.query::<BTreeMap<String, PropValue>>(&cypher, params).await.map_err(ApiError::from)?;
+    Ok(Json(rows.into_iter().map(|r| {
+        let out_rels: Vec<serde_json::Value> = vec![];
+        let in_rels:  Vec<serde_json::Value> = vec![];
+        serde_json::json!({
+            "id":       prop_to_json(r.get("id").unwrap_or(&PropValue::Null)),
+            "labels":   prop_to_json(r.get("labels").unwrap_or(&PropValue::Null)),
+            "props":    prop_to_json(r.get("props").unwrap_or(&PropValue::Null)),
+            "out_rels": out_rels,
+            "in_rels":  in_rels,
+        })
+    }).collect()))
+}
+
 // ── GET /entities/:id ────────────────────────────────────────────────────────
 
 pub async fn get_one(

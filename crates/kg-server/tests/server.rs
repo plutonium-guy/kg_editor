@@ -220,3 +220,43 @@ async fn update_entity_set_and_unset() {
     let v: serde_json::Value = r.json().await.unwrap();
     assert_eq!(v["ok"], true);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn list_search_link_smoke() {
+    let (base, _c) = start_server().await;
+    let cli = reqwest::Client::new();
+
+    // create two people
+    let r = cli.post(format!("{base}/entities")).json(&serde_json::json!({
+        "label": "Person", "props": {"name": "Gina", "role": "engineer"}
+    })).send().await.unwrap();
+    let g_id = r.json::<serde_json::Value>().await.unwrap()["id"].as_i64().unwrap();
+    let r = cli.post(format!("{base}/entities")).json(&serde_json::json!({
+        "label": "Person", "props": {"name": "Hank", "role": "manager"}
+    })).send().await.unwrap();
+    let h_id = r.json::<serde_json::Value>().await.unwrap()["id"].as_i64().unwrap();
+
+    // list by label
+    let r = cli.get(format!("{base}/entities?label=Person")).send().await.unwrap();
+    assert!(r.status().is_success());
+    let v: serde_json::Value = r.json().await.unwrap();
+    let arr = v.as_array().unwrap();
+    assert!(arr.iter().any(|e| e["id"].as_i64() == Some(g_id)));
+
+    // search
+    let r = cli.get(format!("{base}/search?q=Gina")).send().await.unwrap();
+    assert!(r.status().is_success());
+    let v: serde_json::Value = r.json().await.unwrap();
+    assert!(v.as_array().unwrap().iter().any(|e| e["id"].as_i64() == Some(g_id)));
+
+    // create link
+    let r = cli.post(format!("{base}/links")).json(&serde_json::json!({
+        "type": "KNOWS", "start_id": g_id, "end_id": h_id, "props": {"since": 2024}
+    })).send().await.unwrap();
+    assert!(r.status().is_success(), "got {}: {}", r.status(), r.text().await.unwrap());
+    let rel_id = r.json::<serde_json::Value>().await.unwrap()["id"].as_i64().unwrap();
+
+    // delete link
+    let r = cli.delete(format!("{base}/links/{rel_id}")).send().await.unwrap();
+    assert!(r.status().is_success());
+}
