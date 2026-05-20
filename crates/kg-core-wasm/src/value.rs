@@ -1,49 +1,54 @@
 //! Property value bindings.
+//!
+//! `prop_*` functions return a JS value that is the serde-serialized form of
+//! `kg_core::PropValue` (tagged enum: `{kind:"int",value:42}` etc). These can
+//! be nested in JS — e.g. `prop_list([prop_int(1), prop_int(2)])`. UoW methods
+//! deserialize them back to `PropValue` via serde-wasm-bindgen.
 
 use kg_core::value::PropValue;
 use wasm_bindgen::prelude::*;
 
-/// Opaque handle to a `PropValue`. JS code constructs via the `prop_*`
-/// free functions and passes handles into UoW methods.
-#[wasm_bindgen]
-pub struct WasmPropValue {
-    pub(crate) inner: PropValue,
+/// Type alias for clarity in TS bindings — `WasmPropValue` is just the JS-side
+/// JSON form of a `PropValue`.
+pub type WasmPropValue = JsValue;
+
+fn to_js(v: PropValue) -> Result<JsValue, JsValue> {
+    serde_wasm_bindgen::to_value(&v).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
-impl From<PropValue> for WasmPropValue {
-    fn from(v: PropValue) -> Self { WasmPropValue { inner: v } }
+/// Convert a JS-side PropValue (object with {kind, value}) back to Rust.
+pub(crate) fn from_js(v: JsValue) -> Result<PropValue, JsValue> {
+    serde_wasm_bindgen::from_value(v).map_err(|e| JsValue::from_str(&format!("not a PropValue: {e}")))
 }
 
 #[wasm_bindgen]
-pub fn prop_null() -> WasmPropValue { PropValue::Null.into() }
+pub fn prop_null() -> Result<JsValue, JsValue> { to_js(PropValue::Null) }
 
 #[wasm_bindgen]
-pub fn prop_bool(v: bool) -> WasmPropValue { PropValue::Bool(v).into() }
+pub fn prop_bool(v: bool) -> Result<JsValue, JsValue> { to_js(PropValue::Bool(v)) }
 
 #[wasm_bindgen]
-pub fn prop_int(v: i64) -> WasmPropValue { PropValue::Int(v).into() }
+pub fn prop_int(v: i64) -> Result<JsValue, JsValue> { to_js(PropValue::Int(v)) }
 
 #[wasm_bindgen]
-pub fn prop_float(v: f64) -> WasmPropValue { PropValue::Float(v).into() }
+pub fn prop_float(v: f64) -> Result<JsValue, JsValue> { to_js(PropValue::Float(v)) }
 
 #[wasm_bindgen]
-pub fn prop_string(v: String) -> WasmPropValue { PropValue::String(v).into() }
+pub fn prop_string(v: String) -> Result<JsValue, JsValue> { to_js(PropValue::String(v)) }
 
-/// Construct a List from a JS array of PropValue objects (deserialized from JSON-compatible JS values).
+/// Construct a List from a JS array of nested PropValue JS objects.
 #[wasm_bindgen]
-pub fn prop_list(items: js_sys::Array) -> Result<WasmPropValue, JsValue> {
+pub fn prop_list(items: js_sys::Array) -> Result<JsValue, JsValue> {
     let mut out = Vec::with_capacity(items.length() as usize);
     for entry in items.iter() {
-        let v: PropValue = serde_wasm_bindgen::from_value(entry)
-            .map_err(|e| JsValue::from_str(&format!("prop_list item deserialization failed: {e}")))?;
-        out.push(v);
+        out.push(from_js(entry)?);
     }
-    Ok(PropValue::List(out).into())
+    to_js(PropValue::List(out))
 }
 
 /// Construct a Map from a JS array of [string, PropValue] tuples.
 #[wasm_bindgen]
-pub fn prop_map(entries: js_sys::Array) -> Result<WasmPropValue, JsValue> {
+pub fn prop_map(entries: js_sys::Array) -> Result<JsValue, JsValue> {
     use std::collections::BTreeMap;
     let mut out = BTreeMap::new();
     for entry in entries.iter() {
@@ -54,9 +59,7 @@ pub fn prop_map(entries: js_sys::Array) -> Result<WasmPropValue, JsValue> {
         }
         let key = tuple.get(0).as_string()
             .ok_or_else(|| JsValue::from_str("entry[0] must be a string"))?;
-        let val: PropValue = serde_wasm_bindgen::from_value(tuple.get(1))
-            .map_err(|e| JsValue::from_str(&format!("prop_map value deserialization failed: {e}")))?;
-        out.insert(key, val);
+        out.insert(key, from_js(tuple.get(1))?);
     }
-    Ok(PropValue::Map(out).into())
+    to_js(PropValue::Map(out))
 }
