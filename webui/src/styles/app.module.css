@@ -1,9 +1,0 @@
-:root { color-scheme: light dark; }
-* { box-sizing: border-box; }
-html, body, #root { height: 100%; margin: 0; }
-.app { display: grid; grid-template-rows: 48px 1fr 120px; height: 100%; font-family: system-ui, sans-serif; }
-.toolbar { background: #1f2937; color: #f9fafb; display: flex; align-items: center; padding: 0 16px; }
-.main { display: grid; grid-template-columns: 1fr 320px; overflow: hidden; }
-.canvas { background: #f3f4f6; display: flex; align-items: center; justify-content: center; }
-.inspector { border-left: 1px solid #d1d5db; padding: 16px; overflow: auto; }
-.query { border-top: 1px solid #d1d5db; padding: 12px; background: #fafafa; }

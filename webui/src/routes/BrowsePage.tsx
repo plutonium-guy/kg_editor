@@ -5,6 +5,8 @@ import EntityList from "../components/EntityList";
 import EntityForm from "../components/EntityForm";
 import { useSchema } from "../hooks/useSchema";
 import { useStore } from "../state/store";
+import { Button } from "../components/ui/button";
+import { X } from "lucide-react";
 
 export default function BrowsePage() {
   const [params, setParams] = useSearchParams();
@@ -21,35 +23,37 @@ export default function BrowsePage() {
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", height: "100%" }}>
+    <div className="grid grid-cols-[16rem_1fr] h-full">
       <EntityListSidebar />
-      <section style={{ padding: 16, overflow: "auto" }}>
-        <h2 style={{ marginTop: 0, color: "#1f2937" }}>{label ? `${label} entities` : "All entities"}</h2>
+      <section className="p-6 overflow-auto">
+        <header className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-bold text-slate-900">{label ? `${label}` : "All entities"}</h1>
+          {label && (
+            <Button variant="primary" size="sm" onClick={() => {
+              const p = new URLSearchParams(params);
+              p.set("add", "1");
+              setParams(p);
+            }}>+ New {label}</Button>
+          )}
+        </header>
         <EntityList label={label} />
         {showAdd && schema && label && schema.nodes[label] && (
-          <aside style={{
-            position: "fixed", top: 48, right: 0, width: 420, height: "100vh",
-            background: "#fff", borderLeft: "1px solid #d1d5db",
-            padding: 16, overflow: "auto", boxShadow: "-4px 0 12px rgba(0,0,0,0.08)", zIndex: 40,
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <h3 style={{ margin: 0 }}>New {label}</h3>
-              <button onClick={closeAdd} style={{ background: "transparent", border: 0, fontSize: 20, cursor: "pointer" }}>×</button>
+          <aside className="fixed top-14 right-0 w-[420px] h-[calc(100vh-3.5rem)] bg-white border-l border-slate-200 shadow-xl z-40 overflow-auto">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200">
+              <h2 className="font-semibold text-slate-900">New {label}</h2>
+              <button onClick={closeAdd} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
             </div>
-            <EntityForm
-              fields={schema.nodes[label].props}
-              submitLabel="Stage"
-              onSubmit={(values) => {
-                append({
-                  kind: "create_node",
-                  tmpId: `t${tmpCounter}`,
-                  label,
-                  props: values,
-                });
-                setTmpCounter(tmpCounter + 1);
-                closeAdd();
-              }}
-            />
+            <div className="p-5">
+              <EntityForm
+                fields={schema.nodes[label].props}
+                submitLabel="Stage"
+                onSubmit={(values) => {
+                  append({ kind: "create_node", tmpId: `t${tmpCounter}`, label, props: values });
+                  setTmpCounter(tmpCounter + 1);
+                  closeAdd();
+                }}
+              />
+            </div>
           </aside>
         )}
       </section>
