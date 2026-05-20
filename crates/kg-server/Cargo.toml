@@ -1,0 +1,25 @@
+[package]
+name = "kg-server"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Tiny HTTP proxy that fronts kg-neo4j (native Bolt) for the phase-1 UI."
+
+[dependencies]
+kg-core    = { path = "../kg-core" }
+kg-neo4j   = { path = "../kg-neo4j", features = ["native"] }
+axum       = { workspace = true }
+tower      = { workspace = true }
+tower-http = { workspace = true }
+tokio      = { workspace = true }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+thiserror  = { workspace = true }
+tracing    = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+testcontainers = { workspace = true }
+reqwest        = { workspace = true }
