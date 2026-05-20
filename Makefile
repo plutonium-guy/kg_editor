@@ -1,4 +1,4 @@
-.PHONY: neo4j-up neo4j-down test-core test-native test-wasm fmt clippy doc
+.PHONY: neo4j-up neo4j-down test-core test-native test-wasm fmt clippy doc wasm-build webui-dev webui-build kg-server-run
 
 neo4j-up:
 	docker run -d --name kg-neo4j -p 7687:7687 -p 7474:7474 \
@@ -24,3 +24,15 @@ clippy:
 
 doc:
 	cargo doc --no-deps --all-features
+
+wasm-build:
+	cd crates/kg-core-wasm && wasm-pack build --target web --out-dir ../../webui/pkg
+
+webui-dev:
+	cd webui && npm run dev
+
+webui-build:
+	cd webui && npm run build
+
+kg-server-run:
+	cargo run -p kg-server
