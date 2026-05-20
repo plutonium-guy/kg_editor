@@ -1,37 +1,26 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { useStore } from "../state/store";
 
-describe("store", () => {
-  beforeEach(() => {
-    useStore.setState({
-      nodes: {}, rels: {}, selection: { kind: "none" },
-      pendingCount: 0, cypherText: "", layout: "cose-bilkent",
-    });
+describe("pending store", () => {
+  beforeEach(() => useStore.setState({ pending: [] }));
+
+  it("append adds an op", () => {
+    useStore.getState().append({ kind: "create_node", tmpId: "t1", label: "Person", props: { name: "Alice" } });
+    expect(useStore.getState().pending).toHaveLength(1);
   });
 
-  it("addPendingNode increments pendingCount and tags node", () => {
-    useStore.getState().addPendingNode({ localId: 1, labels: ["P"], props: {} });
-    expect(useStore.getState().pendingCount).toBe(1);
-    expect(useStore.getState().nodes["l:1"]?.pending).toBe(true);
+  it("remove by index drops only that op", () => {
+    useStore.getState().append({ kind: "create_node", tmpId: "t1", label: "Person", props: {} });
+    useStore.getState().append({ kind: "create_node", tmpId: "t2", label: "Person", props: {} });
+    useStore.getState().remove(0);
+    expect(useStore.getState().pending).toHaveLength(1);
+    const remaining = useStore.getState().pending[0] as { tmpId?: string };
+    expect(remaining.tmpId).toBe("t2");
   });
 
-  it("replaceGraph wipes pending and resets selection", () => {
-    useStore.getState().addPendingNode({ localId: 1, labels: ["P"], props: {} });
-    useStore.getState().replaceGraph([{ id: 99, labels: ["X"], props: {} }], []);
-    const s = useStore.getState();
-    expect(s.pendingCount).toBe(0);
-    expect(s.nodes["s:99"]).toBeTruthy();
-    expect(s.nodes["l:1"]).toBeUndefined();
-    expect(s.selection.kind).toBe("none");
-  });
-
-  it("resetPending drops pending nodes only", () => {
-    useStore.getState().replaceGraph([{ id: 1, labels: ["A"], props: {} }], []);
-    useStore.getState().addPendingNode({ localId: 7, labels: ["B"], props: {} });
-    useStore.getState().resetPending();
-    const s = useStore.getState();
-    expect(s.pendingCount).toBe(0);
-    expect(s.nodes["s:1"]).toBeTruthy();
-    expect(s.nodes["l:7"]).toBeUndefined();
+  it("clear empties", () => {
+    useStore.getState().append({ kind: "create_node", tmpId: "t1", label: "Person", props: {} });
+    useStore.getState().clear();
+    expect(useStore.getState().pending).toEqual([]);
   });
 });
