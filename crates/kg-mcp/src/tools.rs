@@ -1,6 +1,7 @@
 //! MCP tool implementations.
 //!
-//! Actual tool functions (entity CRUD, search, link traversal …) are wired in
-//! T12.  Each tool will be an `async fn` on the `KgMcpService` struct in
-//! `crate::server`, annotated with `#[rmcp::tool]` and documented with a
-//! JSON Schema–driven description so Claude can discover and call them.
+//! All 7 tools (get_schema, create_entity, update_entity, delete_entity,
+//! link_entities, unlink_entities, find_entities) are defined as async methods
+//! on `KgMcpService` in `crate::server`, registered via rmcp's `#[tool_router]`
+//! and `#[tool_handler]` proc-macros.  This module is kept as a module
+//! declaration placeholder so `main.rs` compiles unchanged.

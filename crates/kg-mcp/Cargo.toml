@@ -17,5 +17,7 @@ reqwest      = { workspace = true }
 anyhow       = { workspace = true }
 # Official Anthropic/MCP Rust SDK (modelcontextprotocol/rust-sdk).
 # "server"       – MCP server types + schemars-based JSON Schema generation.
+# "macros"       – #[tool_router] / #[tool] / #[tool_handler] proc-macros.
 # "transport-io" – stdio (stdin/stdout) transport for the server.
-rmcp = { version = "1.7", features = ["server", "transport-io"] }
+rmcp     = { version = "1.7", features = ["server", "macros", "transport-io"] }
+schemars = "1.0"
