@@ -19,6 +19,7 @@ pub fn router(state: state::AppState) -> Router {
         .route("/health", get(routes::health::health))
         .route("/query",  post(routes::query::run))
         .route("/commit", post(routes::commit::run))
+        .route("/schema", get(routes::schema::run))
         .with_state(state)
         .layer(TraceLayer::new_for_http())
         .layer(cors)

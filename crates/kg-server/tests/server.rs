@@ -130,3 +130,13 @@ async fn bad_cypher_returns_422() {
         v["error"]["code"]
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn schema_returns_yaml() {
+    let (base, _c) = start_server().await;
+    let r = reqwest::get(format!("{base}/schema")).await.unwrap();
+    assert!(r.status().is_success());
+    let v: serde_json::Value = r.json().await.unwrap();
+    assert!(v["nodes"].get("Person").is_some(), "expected Person in returned schema");
+    assert!(v["rels"].get("KNOWS").is_some(), "expected KNOWS in returned schema");
+}
