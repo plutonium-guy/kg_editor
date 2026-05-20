@@ -1,0 +1,42 @@
+nodes:
+  Person:
+    description: An individual person.
+    props:
+      - { name: name,   type: string,  required: true, unique: true }
+      - { name: age,    type: int }
+      - { name: role,   type: enum, values: [engineer, designer, manager, cto, other] }
+      - { name: email,  type: string }
+      - { name: joined, type: date }
+    indexes:
+      - [name]
+  Company:
+    description: A company that employs people.
+    props:
+      - { name: name,    type: string, required: true, unique: true }
+      - { name: founded, type: int }
+      - { name: website, type: string }
+  Skill:
+    description: A discrete skill or competency.
+    props:
+      - { name: name,     type: string, required: true, unique: true }
+      - { name: category, type: enum, values: [language, framework, soft, domain] }
+
+rels:
+  KNOWS:
+    endpoints: [[Person, Person]]
+    cardinality: many_to_many
+    props:
+      - { name: since,    type: int }
+      - { name: strength, type: float }
+  WORKS_AT:
+    endpoints: [[Person, Company]]
+    cardinality: many_to_many
+    props:
+      - { name: role,       type: string }
+      - { name: start_date, type: date }
+      - { name: end_date,   type: date }
+  HAS_SKILL:
+    endpoints: [[Person, Skill]]
+    cardinality: many_to_many
+    props:
+      - { name: level, type: enum, values: [novice, intermediate, expert] }
