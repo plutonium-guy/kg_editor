@@ -97,3 +97,51 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo install cargo-llvm-cov --locked
       - run: cargo llvm-cov -p kg-core --fail-under-lines 80
+
+  test-wasm-bindings:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: jetli/wasm-pack-action@v0.4.0
+      - run: wasm-pack test --headless --chrome crates/kg-core-wasm
+
+  test-kg-server:
+    runs-on: ubuntu-latest
+    services:
+      neo4j:
+        image: neo4j:5-community
+        ports: ["7687:7687"]
+        env:
+          NEO4J_AUTH: neo4j/testtest
+        options: >-
+          --health-cmd="cypher-shell -u neo4j -p testtest 'RETURN 1' || exit 1"
+          --health-interval=10s --health-timeout=5s --health-retries=20
+    env:
+      NEO4J_URI: bolt://127.0.0.1:7687
+      NEO4J_PASSWORD: testtest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p kg-server -- --test-threads=1
+
+  webui-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: jetli/wasm-pack-action@v0.4.0
+      - run: wasm-pack build crates/kg-core-wasm --target web --out-dir ../../webui/pkg
+      - run: cd webui && npm ci
+      - run: cd webui && npm test
+      - run: cd webui && npm run build
