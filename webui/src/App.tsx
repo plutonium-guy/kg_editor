@@ -4,6 +4,7 @@ import BrowsePage from "./routes/BrowsePage";
 import EntityPage from "./routes/EntityPage";
 import GraphPage from "./routes/GraphPage";
 import SearchPage from "./routes/SearchPage";
+import AdminSchemaPage from "./routes/AdminSchemaPage";
 import PendingPanel from "./components/PendingPanel";
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
             <Route path="/entity/:id" element={<EntityPage />} />
             <Route path="/graph" element={<GraphPage />} />
             <Route path="/search" element={<SearchPage />} />
+            <Route path="/admin/schema" element={<AdminSchemaPage />} />
           </Routes>
         </main>
         <PendingPanel />
@@ -34,6 +36,7 @@ function Header() {
         <NavLink to="/browse">Browse</NavLink>
         <NavLink to="/graph">Graph</NavLink>
         <NavLink to="/search">Search</NavLink>
+        <NavLink to="/admin/schema">Admin</NavLink>
       </nav>
     </header>
   );

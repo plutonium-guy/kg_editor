@@ -65,3 +65,45 @@ export async function search(q: string, limit = 20): Promise<EntityDetail[]> {
   u.searchParams.set("limit", String(limit));
   return asJson(await fetch(u));
 }
+
+import type { SchemaFile, NodeDef, RelDef } from "./schema";
+
+export async function putSchema(f: SchemaFile): Promise<SchemaFile> {
+  return asJson(await fetch(`${BASE}/schema`, {
+    method: "PUT", headers: { "content-type": "application/json" },
+    body: JSON.stringify(f),
+  }));
+}
+export async function reloadSchema(): Promise<SchemaFile> {
+  return asJson(await fetch(`${BASE}/schema/reload`, { method: "POST" }));
+}
+export async function createSchemaNode(name: string, def: NodeDef): Promise<SchemaFile> {
+  return asJson(await fetch(`${BASE}/schema/nodes`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name, def }),
+  }));
+}
+export async function updateSchemaNode(label: string, def: NodeDef): Promise<SchemaFile> {
+  return asJson(await fetch(`${BASE}/schema/nodes/${encodeURIComponent(label)}`, {
+    method: "PUT", headers: { "content-type": "application/json" },
+    body: JSON.stringify(def),
+  }));
+}
+export async function deleteSchemaNode(label: string): Promise<SchemaFile> {
+  return asJson(await fetch(`${BASE}/schema/nodes/${encodeURIComponent(label)}`, { method: "DELETE" }));
+}
+export async function createSchemaRel(type: string, def: RelDef): Promise<SchemaFile> {
+  return asJson(await fetch(`${BASE}/schema/rels`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ type, def }),
+  }));
+}
+export async function updateSchemaRel(type: string, def: RelDef): Promise<SchemaFile> {
+  return asJson(await fetch(`${BASE}/schema/rels/${encodeURIComponent(type)}`, {
+    method: "PUT", headers: { "content-type": "application/json" },
+    body: JSON.stringify(def),
+  }));
+}
+export async function deleteSchemaRel(type: string): Promise<SchemaFile> {
+  return asJson(await fetch(`${BASE}/schema/rels/${encodeURIComponent(type)}`, { method: "DELETE" }));
+}
