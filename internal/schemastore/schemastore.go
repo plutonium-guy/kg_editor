@@ -135,6 +135,9 @@ func (s *Store) Save(ctx context.Context, f *schema.File) error {
 		if err := s.upsertNode(ctx, label, def); err != nil {
 			return err
 		}
+		if err := s.MaterializeNode(ctx, label, def); err != nil {
+			return err
+		}
 	}
 	// Rels (after nodes so ALLOWED_FROM/TO can MATCH them)
 	for ty, def := range f.Rels {
@@ -159,7 +162,14 @@ func (s *Store) SaveNode(ctx context.Context, label string, def schema.NodeDef) 
 	if err != nil {
 		return err
 	}
-	return s.upsertNode(ctx, label, def)
+	// Drop any orphaned constraints from the previous shape before re-materializing.
+	if err := s.DropNodeConstraints(ctx, label); err != nil {
+		return err
+	}
+	if err := s.upsertNode(ctx, label, def); err != nil {
+		return err
+	}
+	return s.MaterializeNode(ctx, label, def)
 }
 
 // DeleteNode removes a label.
@@ -172,7 +182,10 @@ func (s *Store) DeleteNode(ctx context.Context, label string) error {
 		 DETACH DELETE n, p, i`,
 		map[string]any{"name": label}, neo4j.EagerResultTransformer,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	return s.DropNodeConstraints(ctx, label)
 }
 
 // SaveRel upserts a single rel type.
@@ -233,6 +246,130 @@ func (s *Store) upsertNode(ctx context.Context, label string, def schema.NodeDef
 		}
 	}
 	return nil
+}
+
+// MaterializeNode applies the declared unique / index constraints to Neo4j.
+// Idempotent; uses CREATE ... IF NOT EXISTS.
+func (s *Store) MaterializeNode(ctx context.Context, label string, def schema.NodeDef) error {
+	if !isCypherIdent(label) {
+		return fmt.Errorf("invalid label %q", label)
+	}
+	// Unique single-prop constraints (from FieldSpec.Unique).
+	for _, p := range def.Props {
+		if !p.Unique {
+			continue
+		}
+		if !isCypherIdent(p.Name) {
+			continue
+		}
+		cypher := fmt.Sprintf(
+			"CREATE CONSTRAINT kg_%s_%s_unique IF NOT EXISTS FOR (n:`%s`) REQUIRE n.`%s` IS UNIQUE",
+			label, p.Name, label, p.Name,
+		)
+		if _, err := neo4j.ExecuteQuery[*neo4j.EagerResult](ctx, s.driver, cypher, nil, neo4j.EagerResultTransformer); err != nil {
+			return fmt.Errorf("constraint %s.%s: %w", label, p.Name, err)
+		}
+	}
+	// Indexes (NodeDef.Indexes is [][]string).
+	for i, cols := range def.Indexes {
+		if len(cols) == 0 {
+			continue
+		}
+		for _, c := range cols {
+			if !isCypherIdent(c) {
+				return fmt.Errorf("invalid index column %q", c)
+			}
+		}
+		colExpr := ""
+		for j, c := range cols {
+			if j > 0 {
+				colExpr += ", "
+			}
+			colExpr += fmt.Sprintf("n.`%s`", c)
+		}
+		// Use a stable name including position so repeated saves are idempotent.
+		ixName := fmt.Sprintf("kg_%s_ix_%d", label, i)
+		cypher := fmt.Sprintf("CREATE INDEX %s IF NOT EXISTS FOR (n:`%s`) ON (%s)", ixName, label, colExpr)
+		if _, err := neo4j.ExecuteQuery[*neo4j.EagerResult](ctx, s.driver, cypher, nil, neo4j.EagerResultTransformer); err != nil {
+			return fmt.Errorf("index %s[%d]: %w", label, i, err)
+		}
+	}
+	return nil
+}
+
+// DropNodeConstraints removes constraints + indexes created by MaterializeNode
+// for the given label. Used when a label is deleted from schema.
+func (s *Store) DropNodeConstraints(ctx context.Context, label string) error {
+	if !isCypherIdent(label) {
+		return fmt.Errorf("invalid label %q", label)
+	}
+	// SHOW CONSTRAINTS filtered by prefix (Neo4j 5 YIELD form).
+	rows, err := neo4j.ExecuteQuery[*neo4j.EagerResult](
+		ctx, s.driver,
+		"SHOW CONSTRAINTS YIELD name WHERE name STARTS WITH $prefix RETURN name",
+		map[string]any{"prefix": fmt.Sprintf("kg_%s_", label)},
+		neo4j.EagerResultTransformer,
+	)
+	if err != nil {
+		return err
+	}
+	for _, r := range rows.Records {
+		m := r.AsMap()
+		name, _ := m["name"].(string)
+		if name == "" {
+			continue
+		}
+		// Names are safe because we generated them from sanitized idents.
+		if _, err := neo4j.ExecuteQuery[*neo4j.EagerResult](
+			ctx, s.driver,
+			fmt.Sprintf("DROP CONSTRAINT %s IF EXISTS", name),
+			nil, neo4j.EagerResultTransformer,
+		); err != nil {
+			return err
+		}
+	}
+	// Indexes
+	rows, err = neo4j.ExecuteQuery[*neo4j.EagerResult](
+		ctx, s.driver,
+		"SHOW INDEXES YIELD name WHERE name STARTS WITH $prefix RETURN name",
+		map[string]any{"prefix": fmt.Sprintf("kg_%s_", label)},
+		neo4j.EagerResultTransformer,
+	)
+	if err != nil {
+		return err
+	}
+	for _, r := range rows.Records {
+		m := r.AsMap()
+		name, _ := m["name"].(string)
+		if name == "" {
+			continue
+		}
+		if _, err := neo4j.ExecuteQuery[*neo4j.EagerResult](
+			ctx, s.driver,
+			fmt.Sprintf("DROP INDEX %s IF EXISTS", name),
+			nil, neo4j.EagerResultTransformer,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// isCypherIdent returns true if s is a safe Cypher identifier ([A-Za-z_][A-Za-z0-9_]*).
+func isCypherIdent(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i, r := range s {
+		ok := r == '_' || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+		if i > 0 {
+			ok = ok || (r >= '0' && r <= '9')
+		}
+		if !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Store) upsertRel(ctx context.Context, ty string, def schema.RelDef) error {
