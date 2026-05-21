@@ -23,7 +23,7 @@ func (d *Deps) createEntity(w http.ResponseWriter, r *http.Request) {
 		writeError(w, "400.bad_body", err.Error())
 		return
 	}
-	def, ok := d.Schema.Nodes[body.Label]
+	def, ok := d.Schema().Nodes[body.Label]
 	if !ok {
 		writeError(w, "400.unknown_label", "unknown node label "+body.Label)
 		return
@@ -65,7 +65,7 @@ func (d *Deps) updateEntity(w http.ResponseWriter, r *http.Request) {
 	}
 	// Validate set against schema if we know the label.
 	if entity, err := d.Store.GetEntity(r.Context(), id); err == nil && entity != nil && len(entity.Labels) > 0 {
-		if def, ok := d.Schema.Nodes[entity.Labels[0]]; ok {
+		if def, ok := d.Schema().Nodes[entity.Labels[0]]; ok {
 			subset := []schema.FieldSpec{}
 			for _, sp := range def.Props {
 				if _, has := body.Set[sp.Name]; has {

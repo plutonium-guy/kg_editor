@@ -11,6 +11,7 @@ import (
 
 	"github.com/plutonium-guy/kg_editor/internal/api"
 	"github.com/plutonium-guy/kg_editor/internal/schema"
+	"github.com/plutonium-guy/kg_editor/internal/schemastore"
 	"github.com/plutonium-guy/kg_editor/internal/store"
 )
 
@@ -23,9 +24,9 @@ func main() {
 	user := envDefault("NEO4J_USER", "neo4j")
 	password := mustEnv("NEO4J_PASSWORD")
 
-	sf, err := schema.FromYAML(schemaPath)
+	seed, err := schema.FromYAML(schemaPath)
 	if err != nil {
-		slog.Error("load schema", "err", err)
+		slog.Error("load seed schema", "err", err)
 		os.Exit(1)
 	}
 	ctx := context.Background()
@@ -36,9 +37,17 @@ func main() {
 	}
 	defer st.Close(ctx)
 
+	ss := schemastore.New(st.Driver())
+	current, err := ss.Bootstrap(ctx, seed)
+	if err != nil {
+		slog.Error("bootstrap schema", "err", err)
+		os.Exit(1)
+	}
+
+	deps := api.NewDeps(current, st, ss)
 	srv := &http.Server{
 		Addr:              bind,
-		Handler:           api.Router(api.Deps{Schema: sf, Store: st}),
+		Handler:           api.Router(deps),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

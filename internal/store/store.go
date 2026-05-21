@@ -37,6 +37,9 @@ func (s *Store) Close(ctx context.Context) error {
 	return s.driver.Close(ctx)
 }
 
+// Driver returns the underlying driver so callers like schemastore can share the connection.
+func (s *Store) Driver() neo4j.DriverWithContext { return s.driver }
+
 // Ping is a cheap reachability check used by /health.
 func (s *Store) Ping(ctx context.Context) error {
 	return s.driver.VerifyConnectivity(ctx)

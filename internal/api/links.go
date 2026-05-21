@@ -25,7 +25,7 @@ func (d *Deps) createLink(w http.ResponseWriter, r *http.Request) {
 		body.Props = map[string]any{}
 	}
 	// Endpoint validation against schema.
-	if relDef, ok := d.Schema.Rels[body.Type]; ok && len(relDef.Endpoints) > 0 {
+	if relDef, ok := d.Schema().Rels[body.Type]; ok && len(relDef.Endpoints) > 0 {
 		sl, el, err := d.Store.LookupLabels(r.Context(), body.StartID, body.EndID)
 		if err != nil {
 			writeError(w, "404.not_found", "start/end not found")

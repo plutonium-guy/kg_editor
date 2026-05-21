@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/plutonium-guy/kg_editor/internal/schema"
+	"github.com/plutonium-guy/kg_editor/internal/schemastore"
 	"github.com/plutonium-guy/kg_editor/internal/store"
 )
 
@@ -37,7 +38,11 @@ func setupServer(t *testing.T) (*httptest.Server, func()) {
 	sf, err := schema.FromYAML(yamlPath)
 	require.NoError(t, err)
 
-	srv := httptest.NewServer(Router(Deps{Schema: sf, Store: s}))
+	ss := schemastore.New(s.Driver())
+	_, err = ss.Bootstrap(ctx, sf)
+	require.NoError(t, err)
+	deps := NewDeps(sf, s, ss)
+	srv := httptest.NewServer(Router(deps))
 	return srv, func() {
 		srv.Close()
 		_ = s.Close(ctx)
